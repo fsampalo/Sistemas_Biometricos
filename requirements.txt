@@ -1,0 +1,3 @@
+# YuNet 2023mar (cv2.FaceDetectorYN) requiere OpenCV >= 4.8
+opencv-python>=4.8,<5
+numpy>=1.24,<3
