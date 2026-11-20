@@ -1,26 +1,13 @@
-# Entorno virtual
+# Entorno y generados
 .venv/
-venv/
-env/
-
-# Python
 __pycache__/
-*.py[cod]
-*.egg-info/
-.pytest_cache/
-.ipynb_checkpoints/
-
-# Modelos (se descargan con download_models.py)
-models/
-*.onnx
-*.part
-
-# Resultados generados por detector.py
+*.pyc
 salida/
+models/
+bd_sistema.csv
+bd_sistema.csv.tmp
+umbral.txt
 
-# IDE / sistema
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
-desktop.ini
+# Datos del docente (se proporcionan aparte; no versionar)
+Dataset/
+Dataset.tar.gz
