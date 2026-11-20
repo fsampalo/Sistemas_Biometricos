@@ -1,0 +1,20 @@
+{
+  "umbral": 0.23145,
+  "umbral_cara": 0.92603,
+  "far_objetivo": 0.01,
+  "frr_estimado_cigala_1foto": 0.6538,
+  "caricidad_caras_min": 0.946,
+  "caricidad_no_caras_max": 0.9563,
+  "no_caras_que_pasan_por_categoria": {
+    "plana": "0/3",
+    "ruido": "0/5",
+    "ruido suavizado": "3/3",
+    "gradiente": "0/2",
+    "peri\u00f3dica": "0/3",
+    "cara invertida": "10/10",
+    "cara girada 90\u00b0": "10/10",
+    "fondo de foto": "102/196"
+  },
+  "n_impostores": 2989,
+  "n_genuinos": 156
+}

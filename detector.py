@@ -14,6 +14,7 @@ Uso rápido:
 
 from __future__ import annotations
 
+import hashlib
 import os
 from dataclasses import dataclass, field
 
@@ -24,6 +25,7 @@ RUTA_MODELO_YUNET = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "models", "face_detection_yunet_2023mar.onnx",
 )
+SHA256_YUNET = "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
 
 # Posiciones de referencia de los 5 landmarks para una cara de 112x112
 # (plantilla estándar de ArcFace/InsightFace). Orden: ojo dcho, ojo izq, nariz, boca dcha, boca izq
@@ -37,6 +39,35 @@ PLANTILLA_LANDMARKS_112 = np.array(
 # Límites de entrada (el sistema puede ser atacado: no aceptar cualquier cosa)
 TAM_MAX_LADO = 4096
 TAM_MIN_LADO = 32
+TAM_MAX_FICHERO = 40 * 1024 * 1024      # 40 MB
+MAX_PIXELES_DECODIFICAR = 80_000_000    # protección frente a "bombas" de descompresión
+
+
+def _decodificar(datos: bytes) -> np.ndarray | None:
+    """Bytes -> imagen BGR. OpenCV primero; Pillow como respaldo.
+
+    El docente entrega fotos cuya extensión NO coincide con el formato real
+    (p. ej. un AVIF llamado .jpg, un WebP llamado .jpg). OpenCV no lee AVIF/HEIC,
+    así que se recurre a Pillow (con pillow-heif si está instalado). La
+    orientación EXIF se aplica en ambos casos.
+    """
+    img = cv2.imdecode(np.frombuffer(datos, np.uint8), cv2.IMREAD_COLOR)
+    if img is not None:
+        return img
+    try:
+        import io
+        from PIL import Image, ImageOps
+        try:
+            import pillow_heif  # type: ignore
+            pillow_heif.register_heif_opener()
+        except ImportError:
+            pass
+        Image.MAX_IMAGE_PIXELS = MAX_PIXELES_DECODIFICAR
+        with Image.open(io.BytesIO(datos)) as im:
+            im = ImageOps.exif_transpose(im).convert("RGB")
+            return cv2.cvtColor(np.asarray(im), cv2.COLOR_RGB2BGR)
+    except Exception:
+        return None
 
 
 def guardar_imagen(ruta: str, img: np.ndarray) -> None:
@@ -87,6 +118,9 @@ class DetectorCaras:
                 "Ejecuta download_models.py")
         # Cargar desde buffer: OpenCV no abre rutas con tildes/ñ en Windows
         modelo = np.fromfile(RUTA_MODELO_YUNET, np.uint8)
+        if hashlib.sha256(modelo.tobytes()).hexdigest() != SHA256_YUNET:
+            raise ErrorDeteccion("El modelo YuNet no coincide con el sha256 esperado "
+                                 "(¿fichero manipulado?). Ejecuta download_models.py")
         self._yunet = cv2.FaceDetectorYN.create(
             "onnx", modelo, np.empty(0, np.uint8), (320, 320),
             score_threshold=umbral_confianza, nms_threshold=0.3, top_k=50)
@@ -97,14 +131,24 @@ class DetectorCaras:
         """Acepta ruta (str/Path), bytes o np.ndarray. Devuelve imagen BGR uint8 validada."""
         if isinstance(foto, np.ndarray):
             img = foto
-        elif isinstance(foto, (bytes, bytearray)):
-            img = cv2.imdecode(np.frombuffer(foto, np.uint8), cv2.IMREAD_COLOR)
         else:
-            ruta = os.fspath(foto)
-            if not os.path.isfile(ruta):
-                raise ErrorDeteccion(f"No existe el fichero: {ruta}")
-            # imdecode en vez de imread: funciona con rutas con tildes en Windows
-            img = cv2.imdecode(np.fromfile(ruta, np.uint8), cv2.IMREAD_COLOR)
+            if isinstance(foto, (bytes, bytearray)):
+                datos = bytes(foto)
+            else:
+                try:
+                    ruta = os.fspath(foto)
+                except TypeError:
+                    raise ErrorDeteccion(
+                        f"Tipo de foto no soportado: {type(foto).__name__}") from None
+                if not os.path.isfile(ruta):
+                    raise ErrorDeteccion(f"No existe el fichero: {ruta}")
+                if os.path.getsize(ruta) > TAM_MAX_FICHERO:
+                    raise ErrorDeteccion("Fichero de imagen demasiado grande")
+                with open(ruta, "rb") as f:   # funciona con rutas con tildes
+                    datos = f.read()
+            if len(datos) > TAM_MAX_FICHERO:
+                raise ErrorDeteccion("Imagen demasiado grande")
+            img = _decodificar(datos)
 
         if img is None or not isinstance(img, np.ndarray) or img.size == 0:
             raise ErrorDeteccion("La imagen no se pudo decodificar")

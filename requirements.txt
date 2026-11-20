@@ -1,3 +1,9 @@
 # YuNet 2023mar (cv2.FaceDetectorYN) requiere OpenCV >= 4.8
-opencv-python>=4.8,<5
+opencv-python-headless>=4.8,<5
 numpy>=1.24,<3
+# Respaldo para formatos que OpenCV no lee (el Dataset trae un AVIF llamado .jpg)
+pillow>=11.3
+# Opcional: fotos HEIC de iPhone
+pillow-heif>=0.18
+# Solo para la figura DET de evaluar.py (opcional)
+matplotlib>=3.7

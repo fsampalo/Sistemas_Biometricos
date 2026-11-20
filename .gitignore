@@ -3,10 +3,11 @@
 __pycache__/
 *.pyc
 salida/
-models/
+*.tmp
+models/*.onnx
+models/clave_bd.key
 bd_sistema.csv
-bd_sistema.csv.tmp
-umbral.txt
+bd_sistema.csv.mac
 
 # Datos del docente (se proporcionan aparte; no versionar)
 Dataset/

@@ -1,8 +1,9 @@
 """
-Demo de arranque: muestra los 9 métodos del sistema EBGM funcionando.
+Demo de arranque: los 9 métodos del sistema EBGM funcionando.
 
-Si no existe la BD, la crea inscribiendo los famosos + cigala (necesita Dataset/).
-Luego ejecuta un ejemplo de cada método.
+Si no existe la BD/modelo, los crea (inscribir_dataset.py; necesita Dataset/).
+Las inscripciones de prueba se hacen sobre una COPIA temporal de la BD para no
+ensuciar la real.
 
 Uso:
     python demo.py
@@ -11,56 +12,79 @@ Uso:
 from __future__ import annotations
 
 import os
+import shutil
+import tempfile
 
-import cv2
-
-from detector import DetectorCaras
-from ebgm import ExtractorEBGM
-from sistema import SistemaReconocimiento, RUTA_BD_POR_DEFECTO
+from ebgm import RUTA_MODELO
+from sistema import RUTA_BD_POR_DEFECTO, ErrorSistema, SistemaReconocimiento
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
 
 
 def asegurar_bd():
-    if not os.path.isfile(RUTA_BD_POR_DEFECTO):
-        print("No hay BD; inscribiendo famosos + cigala...\n")
+    if not (os.path.isfile(RUTA_BD_POR_DEFECTO) and os.path.isfile(RUTA_MODELO)):
+        print("No hay BD/modelo; entrenando EBGM e inscribiendo famosos + cigala...\n")
         import inscribir_dataset
         inscribir_dataset.main()
         print()
 
 
+def corto(r: dict) -> str:
+    r = dict(r)
+    if "ranking" in r:
+        r["ranking"] = [(k, round(s, 3)) for k, s in r["ranking"][:3]]
+    for k in ("similitud", "umbral"):
+        if isinstance(r.get(k), float):
+            r[k] = round(r[k], 4)
+    return str(r)
+
+
 def main():
     asegurar_bd()
-    sis = SistemaReconocimiento()
-    print(f"\nBD: {len(sis.personas())} personas inscritas | umbral={sis.umbral:+.4f}\n")
+    tmp = tempfile.mkdtemp(prefix="ebgm_demo_")
+    bd = os.path.join(tmp, "bd.csv")
+    shutil.copy(RUTA_BD_POR_DEFECTO, bd)
+    shutil.copy(RUTA_BD_POR_DEFECTO + ".mac", bd + ".mac")
+    # la demo muestra similitudes (modo evaluación); al final, el modo por defecto
+    sis = SistemaReconocimiento(ruta_bd=bd, auditoria=False, exponer_puntuaciones=True)
+    print(f"BD: {len(sis.personas())} personas | umbral={sis.umbral:+.4f}\n")
 
-    foto_prueba = os.path.join(AQUI, "fotos_cigala", "4.jpg")   # cigala NO inscrita
-    print(f"Foto de prueba: {os.path.relpath(foto_prueba, AQUI)} (el cigala)\n")
+    # foto del cigala que el sistema NUNCA ha visto (no usada al inscribir)
+    foto = os.path.join(AQUI, "fotos_cigala_test", "baltycka2024_01.jpg")
+    otra = os.path.join(AQUI, "Dataset", "keanu_reeves_2021.png")
+    print(f"Foto de prueba: {os.path.relpath(foto, AQUI)} (cigala, no inscrita)\n")
 
-    print("── pipeline completo ──")
-    print("  identificar(foto) ->", sis.identificar(foto_prueba)["id"])
-    print("  verificar('cigala', foto) ->", sis.verificar("cigala", foto_prueba)["verificado"])
+    print("── pipeline completo (detector + extractor + matcher) ──")
+    print("  identificar(foto)            ->", corto(sis.identificar(foto)))
+    print("  verificar('cigala', foto)    ->", corto(sis.verificar("cigala", foto)))
+    print("  verificar('adele', foto)     ->", corto(sis.verificar("adele", foto)))
 
-    print("\n── sin detector (_sd): sobre la cara ya recortada ──")
-    cara = DetectorCaras().extraer_cara(foto_prueba)
-    ruta_cara = os.path.join(AQUI, "salida", "cara_demo.png")
-    os.makedirs(os.path.dirname(ruta_cara), exist_ok=True)
-    cv2.imwrite(ruta_cara, cara)
-    print("  identificar_sd(cara) ->", sis.identificar_sd(ruta_cara)["id"])
-    print("  verificar_sd('cigala', cara) ->", sis.verificar_sd("cigala", ruta_cara)["verificado"])
+    print("\n── sin detector (_sd): cara ya recortada y alineada ──")
+    cara = sis.extraer_cara(foto)
+    print("  identificar_sd(cara)         ->", corto(sis.identificar_sd(cara)))
+    print("  verificar_sd('cigala', cara) ->", corto(sis.verificar_sd("cigala", cara)))
 
-    print("\n── sólo template (_t) ──")
-    tpl = ExtractorEBGM().extraer(cara)
-    print("  identificar_t(template) ->", sis.identificar_t(tpl)["id"])
-    print("  verificar_t('cigala', template) ->", sis.verificar_t("cigala", tpl)["verificado"])
+    print("\n── solo template (_t) ──")
+    tpl = sis.extraer_template(foto)
+    print("  identificar_t(template)         ->", corto(sis.identificar_t(tpl)))
+    print("  verificar_t('cigala', template) ->", corto(sis.verificar_t("cigala", tpl)))
 
-    print("\n── inscribir una identidad nueva y recuperarla ──")
-    sis.inscribir_t("persona_demo", tpl)
-    print("  identificar_t(mismo template) ->", sis.identificar_t(tpl)["id"])
-    # limpiar la identidad de demo
-    sis._bd.pop("persona_demo", None); sis._guardar_bd()
+    print("\n── modo por defecto: NO se exponen similitudes (anti hill-climbing) ──")
+    sis_def = SistemaReconocimiento(ruta_bd=bd, auditoria=False)
+    print("  identificar(foto)         ->", sis_def.identificar(foto))
+    print("  verificar('cigala', foto) ->", sis_def.verificar("cigala", foto))
 
-    print("\nListo. Para métricas: python evaluar.py | Para seguridad: python evaluar_ataques.py")
+    print("\n── inscribir (las 3 variantes) sobre la copia temporal ──")
+    print("  inscribir('demo_foto', foto_keanu)  ->", sis.inscribir("demo_foto", otra))
+    print("  inscribir_sd('demo_cara', cara)     ->", sis.inscribir_sd("demo_cara", cara))
+    print("  inscribir_t('demo_tpl', template)   ->", sis.inscribir_t("demo_tpl", tpl))
+    try:
+        sis.inscribir("cigala", foto)
+    except ErrorSistema as e:
+        print("  inscribir('cigala', ...) otra vez  -> rechazado:", e)
+
+    shutil.rmtree(tmp, ignore_errors=True)
+    print("\nListo. Evaluación: python evaluar.py | Seguridad: python evaluar_ataques.py")
 
 
 if __name__ == "__main__":
