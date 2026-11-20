@@ -1,14 +1,5 @@
-# Entorno y generados
+# Entorno local (500 MB de binarios de Windows; se recrea con requirements.txt)
 .venv/
 __pycache__/
 *.pyc
-salida/
 *.tmp
-models/*.onnx
-models/clave_bd.key
-bd_sistema.csv
-bd_sistema.csv.mac
-
-# Datos del docente (se proporcionan aparte; no versionar)
-Dataset/
-Dataset.tar.gz
