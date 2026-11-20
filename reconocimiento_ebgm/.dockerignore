@@ -1,0 +1,6 @@
+resultados/
+__pycache__/
+*.pyc
+memoria/*.aux
+memoria/*.log
+memoria/*.out

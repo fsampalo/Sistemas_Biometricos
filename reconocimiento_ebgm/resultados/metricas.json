@@ -1,0 +1,253 @@
+{
+ "umbral": 0.62,
+ "por_aumento": {
+  "detector/original": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.9999999999013567,
+   "gen_min": 0.9999999998548609,
+   "imp_max": 0.38131626752609576,
+   "frr": 0.0,
+   "rank1": 1.0,
+   "ident_correcta_umbral": 1.0
+  },
+  "detector/brillo": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.9758140079914778,
+   "gen_min": 0.41166937950708254,
+   "imp_max": 0.4157044406906302,
+   "frr": 0.02,
+   "rank1": 1.0,
+   "ident_correcta_umbral": 0.98
+  },
+  "detector/oscuro": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.9739895297503,
+   "gen_min": 0.7287896806441215,
+   "imp_max": 0.3874683710448175,
+   "frr": 0.0,
+   "rank1": 1.0,
+   "ident_correcta_umbral": 1.0
+  },
+  "detector/contraste": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.9768139183773081,
+   "gen_min": 0.7305281532586624,
+   "imp_max": 0.38063961320124856,
+   "frr": 0.0,
+   "rank1": 1.0,
+   "ident_correcta_umbral": 1.0
+  },
+  "detector/gamma": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.9012421870053603,
+   "gen_min": 0.692959091375482,
+   "imp_max": 0.4457662895201233,
+   "frr": 0.0,
+   "rank1": 1.0,
+   "ident_correcta_umbral": 1.0
+  },
+  "detector/escala_grises": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.9818554696580825,
+   "gen_min": 0.6855167340184599,
+   "imp_max": 0.3916164176282166,
+   "frr": 0.0,
+   "rank1": 1.0,
+   "ident_correcta_umbral": 1.0
+  },
+  "detector/desenfoque": {
+   "n": 50,
+   "fallos_deteccion": 1,
+   "gen_mediana": 0.6992635175448135,
+   "gen_min": -0.09137431195967033,
+   "imp_max": 0.6154720322911591,
+   "frr": 0.42,
+   "rank1": 0.7,
+   "ident_correcta_umbral": 0.58
+  },
+  "detector/ruido": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.947119663594026,
+   "gen_min": 0.5239777080494681,
+   "imp_max": 0.3734013750760121,
+   "frr": 0.02,
+   "rank1": 1.0,
+   "ident_correcta_umbral": 0.98
+  },
+  "detector/jpeg_q12": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.9472694680316989,
+   "gen_min": 0.48494454840208107,
+   "imp_max": 0.3870838852083639,
+   "frr": 0.02,
+   "rank1": 1.0,
+   "ident_correcta_umbral": 0.98
+  },
+  "detector/baja_resolucion": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.783819305223672,
+   "gen_min": 0.4569198172671922,
+   "imp_max": 0.5515321604023147,
+   "frr": 0.06,
+   "rank1": 1.0,
+   "ident_correcta_umbral": 0.94
+  },
+  "detector/rotacion_12": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.9628801611455715,
+   "gen_min": 0.5549644362920991,
+   "imp_max": 0.3874552741805731,
+   "frr": 0.02,
+   "rank1": 1.0,
+   "ident_correcta_umbral": 0.98
+  },
+  "detector/perspectiva": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.9268795964097661,
+   "gen_min": 0.6858623502644334,
+   "imp_max": 0.39838255476793716,
+   "frr": 0.0,
+   "rank1": 1.0,
+   "ident_correcta_umbral": 1.0
+  },
+  "detector/espejo": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.4558789893705716,
+   "gen_min": -0.06392251930949422,
+   "imp_max": 0.5684111590468601,
+   "frr": 0.92,
+   "rank1": 0.88,
+   "ident_correcta_umbral": 0.08
+  },
+  "detector/gafas_sol": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.42366423883449145,
+   "gen_min": 0.1278990103552556,
+   "imp_max": 0.3791348477853839,
+   "frr": 0.92,
+   "rank1": 0.86,
+   "ident_correcta_umbral": 0.08
+  },
+  "detector/mascarilla": {
+   "n": 50,
+   "fallos_deteccion": 2,
+   "gen_mediana": 0.3741308335533805,
+   "gen_min": 0.03153181217249457,
+   "imp_max": 0.5746530947771774,
+   "frr": 0.9,
+   "rank1": 0.5,
+   "ident_correcta_umbral": 0.1
+  },
+  "sin_detector/original": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.8445122383708319,
+   "gen_min": 0.09839433852917732,
+   "imp_max": 0.3993677987612138,
+   "frr": 0.32,
+   "rank1": 0.94,
+   "ident_correcta_umbral": 0.68
+  },
+  "sin_detector/brillo": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.8507255252900077,
+   "gen_min": 0.14691465789489289,
+   "imp_max": 0.38999818519598173,
+   "frr": 0.3,
+   "rank1": 0.88,
+   "ident_correcta_umbral": 0.7
+  },
+  "sin_detector/desenfoque": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.43260223766827344,
+   "gen_min": -0.09218354108811373,
+   "imp_max": 0.6018562522538861,
+   "frr": 0.78,
+   "rank1": 0.48,
+   "ident_correcta_umbral": 0.22
+  },
+  "sin_detector/ruido": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.8241525818651418,
+   "gen_min": 0.010076668986233559,
+   "imp_max": 0.37086441995139224,
+   "frr": 0.32,
+   "rank1": 0.88,
+   "ident_correcta_umbral": 0.68
+  },
+  "sin_detector/rotacion_12": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.3093380260741565,
+   "gen_min": -0.03829632654755843,
+   "imp_max": 0.46334083610818627,
+   "frr": 0.82,
+   "rank1": 0.52,
+   "ident_correcta_umbral": 0.18
+  },
+  "sin_detector/gafas_sol": {
+   "n": 50,
+   "fallos_deteccion": 0,
+   "gen_mediana": 0.3170198784322631,
+   "gen_min": -0.30677080121188255,
+   "imp_max": 0.5006797261435173,
+   "frr": 0.96,
+   "rank1": 0.6,
+   "ident_correcta_umbral": 0.04
+  }
+ },
+ "global": {
+  "detector/todas": {
+   "n_gen": 747,
+   "n_imp": 36603,
+   "eer": 0.034860530557604574,
+   "umbral_eer": 0.2505,
+   "far_umbral": 0.0,
+   "frr_umbral": 0.21686746987951808,
+   "imp_max": 0.6154720322911591
+  },
+  "detector/sin_oclusion_ni_espejo": {
+   "n_gen": 599,
+   "n_imp": 29351,
+   "eer": 0.01166910837790876,
+   "umbral_eer": 0.311,
+   "far_umbral": 0.0,
+   "frr_umbral": 0.045075125208681135,
+   "imp_max": 0.6154720322911591
+  },
+  "sin_detector/todas": {
+   "n_gen": 300,
+   "n_imp": 14700,
+   "eer": 0.1232312925170068,
+   "umbral_eer": 0.1665,
+   "far_umbral": 0.0,
+   "frr_umbral": 0.5833333333333334,
+   "imp_max": 0.6018562522538861
+  },
+  "sin_detector/sin_oclusion_ni_espejo": {
+   "n_gen": 250,
+   "n_imp": 12250,
+   "eer": 0.11183673469387756,
+   "umbral_eer": 0.17250000000000001,
+   "far_umbral": 0.0,
+   "frr_umbral": 0.508,
+   "imp_max": 0.6018562522538861
+  }
+ }
+}

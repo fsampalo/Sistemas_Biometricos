@@ -1,0 +1,109 @@
+{
+ "P1_entradas_no_faciales_ruta_sd": {
+  "supuesto": "El evaluador usa identificar_sd/verificar_sd (sin detector) con imagenes que no son caras.",
+  "lectura_defensiva": "La ruta sin detector no comprueba que haya una cara: hay que validar la calidad del ajuste (S_FBG) y rechazar por debajo de un umbral; con detector, estas entradas se rechazan solas.",
+  "datos": {
+   "no_caras": [
+    {
+     "entrada": "gris_uniforme",
+     "identificado": "rechazada: Magnitudes de jets no validas",
+     "score": null,
+     "S_FBG": 0.0
+    },
+    {
+     "entrada": "ruido_uniforme",
+     "identificado": null,
+     "score": 0.194,
+     "S_FBG": 0.809
+    },
+    {
+     "entrada": "degradado",
+     "identificado": null,
+     "score": 0.554,
+     "S_FBG": 0.762
+    },
+    {
+     "entrada": "recorte_de_fondo",
+     "identificado": null,
+     "score": 0.397,
+     "S_FBG": 0.874
+    }
+   ],
+   "S_FBG_caras_reales": {
+    "min": 0.905,
+    "mediana": 0.949
+   }
+  }
+ },
+ "P2_reenvio_de_template": {
+  "supuesto": "El evaluador consigue LEER la BD y reenvia por verificar_t/identificar_t el template de la victima.",
+  "lectura_defensiva": "La comparacion de templates no distingue 'misma persona' de 'mismo fichero'. Mitigacion: canal autenticado hacia el comparador y deteccion de duplicados exactos; la verificacion no debe aceptar un template identico bit a bit al almacenado.",
+  "datos": {
+   "verificaciones": "50/50",
+   "identificaciones": "50/50",
+   "score": 1.0
+  }
+ },
+ "P3_template_generico": {
+  "supuesto": "El evaluador fabrica un template 'promedio' para intentar colarse como cualquier inscrito sin su foto.",
+  "lectura_defensiva": "El promedio de magnitudes queda lejos del umbral: no existe un 'template maestro' trivial. La defensa real sigue siendo el umbral y la unicidad de los jets por persona.",
+  "datos": {
+   "media_bd": {
+    "mejor": 0.248,
+    "verifica_a": 0
+   },
+   "mediana_bd": {
+    "mejor": 0.54,
+    "verifica_a": 0
+   },
+   "jets_medios_fbg": {
+    "mejor": 0.0,
+    "verifica_a": 0
+   }
+  }
+ },
+ "P4_busqueda_por_consultas": {
+  "supuesto": "El evaluador puede llamar a verificar_t sin limite y usa la PUNTUACION devuelta para 'escalar la colina'.",
+  "lectura_defensiva": "Devolver la puntuacion permite reconstruir un template que verifica sin foto. Mitigaciones: no exponer el score (solo aceptar/rechazar), limitar intentos y registrar rafagas de consultas.",
+  "datos": {
+   "exitos": "8/8",
+   "consultas_mediana": 1385
+  }
+ },
+ "P5_inversion_de_template": {
+  "supuesto": "El evaluador LEE la BD (solo magnitudes) y reconstruye una imagen de cara que presenta por la ruta con/sin detector.",
+  "lectura_defensiva": "Aun guardando solo magnitudes, el template es invertible porque la respuesta de Gabor es lineal: se recupera una cara reconocible. Mitigaciones: cifrar la BD, plantilla protegida/'cancelable' (proyeccion no invertible) y deteccion de vivacidad para que una imagen plana no baste.",
+  "datos": {
+   "verificar_sd": [
+    true,
+    0.672
+   ],
+   "baseline_cara_media": 0.015
+  }
+ },
+ "P6_escritura_en_bd": {
+  "supuesto": "El evaluador consigue ESCRIBIR en el CSV y cambia el template de la victima por el suyo.",
+  "lectura_defensiva": "Sin integridad, quien escribe el CSV decide quien es quien. Con HMAC por fila y clave fuera de la BD, las filas manipuladas se rechazan al cargar; ademas conviene control de acceso y registro de cambios.",
+  "datos": {
+   "sin_hmac_suplanta": [
+    true,
+    1.0
+   ],
+   "con_hmac_filas_rechazadas": 50,
+   "con_hmac_keanu_en_bd": false
+  }
+ },
+ "P7_entradas_malformadas": {
+  "supuesto": "El evaluador envia identificadores y templates no validos para provocar errores o inyecciones en el CSV.",
+  "lectura_defensiva": "La API valida id (lista blanca de caracteres) y template (longitud, finitud, rango) antes de tocar la BD, de modo que no se puede inyectar una fila corrupta ni un id con saltos de linea.",
+  "datos": {
+   "id_con_salto_de_linea": "rechazado: Identificador no valido: 'a\\nb'",
+   "id_vacio": "rechazado: Identificador no valido: ''",
+   "template_corto": "rechazado: Template de longitud 10, se esperaba 1320",
+   "template_nan": "rechazado: Template con valores no finitos",
+   "template_negativo": "rechazado: Magnitudes de jets no validas",
+   "id_inexistente": "aceptado -> (False, 0.0)",
+   "reinscribir_existente": "rechazado: El id 'adele' ya esta inscrito"
+  }
+ }
+}
