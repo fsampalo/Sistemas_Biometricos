@@ -1,8 +1,8 @@
 {
-  "umbral": 0.23139,
+  "umbral": 0.32677,
   "umbral_cara": 0.92604,
   "far_objetivo": 0.01,
-  "frr_estimado_cigala_1foto": 0.6538,
+  "frr_estimado_cigala_1foto": 0.5833,
   "caricidad_caras_min": 0.946,
   "caricidad_no_caras_max": 0.9563,
   "no_caras_que_pasan_por_categoria": {

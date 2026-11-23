@@ -57,7 +57,8 @@ impostores, famosos entre sí y Cigala contra famosos):
 |---|---|---|---|---|---|---|
 | EBGM anterior | 34,6 % | 0,65 | 19 % | 2,6 % | 4,6 % | — |
 | + 7 escalas + CLAHE + fiducial + σ=0,75λ | 16,7 % | 1,87 | 33 % | 32,1 % | 2,6 % | 71 % |
-| **+ invariancia a espejo (final)** | **14,1 %** | **2,01** | **46 %** | **34,6 %** | **0,3 %** | **98 %** |
+| + invariancia a espejo (ronda 5) | 14,1 % | 2,01 | 46 % | 34,6 % | 0,3 % | 98 % |
+| **+ agregación robusta: mejor media cara sin sus 3 nodos peores (final, ronda 6)** | **12,8 %** | **2,14** | **51 %** | **41,7 %** | **0,3 %** | **98 %** |
 
 Descartado por no aportar (implementado y activable): Tan-Triggs, simetrizar el
 template, rejilla densa o mixta, término de geometría, compresión logarítmica,
@@ -67,7 +68,7 @@ template, rejilla densa o mixta, término de geometría, compresión logarítmic
 
 ## 3. Fase 2 — Evaluación del rendimiento (`evaluar.py`)
 
-Sistema **desplegado** (BD real, umbral 0,231 calibrado a FAR 1 %).
+Sistema **desplegado** (BD real, umbral 0,327 calibrado a FAR 1 %).
 
 ### 3.1 Lo que FUNCIONA
 | Prueba | Resultado |
@@ -75,14 +76,14 @@ Sistema **desplegado** (BD real, umbral 0,231 calibrado a FAR 1 %).
 | 5 fotos NUEVAS del Cigala vs Cigala inscrito | **5/5 aceptadas**, rank-1 **100 %** (azar 2 %), d' 5,4 |
 | Fotos degradadas de los 49 famosos (oscura, clara, baja resolución, JPEG calidad 15, giro 12°, ruido, luz lateral) | **100 %** rank-1 y verificación |
 | Fotos en espejo (selfie) | 98 % |
-| FAR real en el umbral desplegado | 1,3 % (1470 pares impostores) |
+| FAR real en el umbral desplegado | 1,2 % (1470 pares impostores) |
 | El template medio del Cigala **no es un «imán»** | atracción top-3 0,19, por debajo del umbral |
 | Velocidad | ~50 ms por foto; `_t` < 1 ms |
 
 ### 3.2 Lo que FALLA (límites conocidos del reconocimiento)
 | # | Fallo | Evidencia |
 |---|---|---|
-| R1 | Con **una sola foto inscrita** y fotos muy distintas (otra década, perfil, gafas), EBGM rechaza mucho | Test vs 1 foto: EER 15 %, **TAR ≈ 25 % a FAR 1 %** (FRR 63 % en el umbral) |
+| R1 | Con **una sola foto inscrita** y fotos muy distintas (otra década, perfil, gafas), EBGM rechaza mucho | Test vs 1 foto: EER 12,4 %, **TAR ≈ 38 % a FAR 1 %** (FRR 60 % en el umbral). Antes de la ronda 6: EER 15 %, TAR 25 %, FRR 63 % |
 | R2 | **Gemelos**: Twin Melody, gemelos Weasley y Olsen están en el Dataset; el gemelo no inscrito pasará por el inscrito | Inherente a la biometría facial |
 | R3 | Parejas de famosos que **superan el umbral** entre sí (FAR 1 % ⇒ ~1 de cada 100 pares) | ariana_grande ~ mary-kate_olsen 0,36; christian_bale ~ keanu_reeves 0,34; idris_elba ~ willem_dafoe 0,30 |
 | R4 | «Lobos/corderos»: keanu_reeves, mary-kate_olsen, ariana_grande y metrika atraen más impostores | Zoo de Doddington en `evaluar.py` |
@@ -100,7 +101,7 @@ vulnerabilidades conocidas.**
 | Ataque | Resultado | Mitigación / comentario |
 |---|---|---|
 | A1 *Replay* de un template por `verificar_t` | ⚠️ VULNERABLE (sim 1,0) | Inherente a `_t`. No exponer `_t` fuera; plantillas cancelables; canal autenticado extractor→matcher |
-| A2 No-caras por `_sd` | ⚠️ PARCIAL: plano, ruido, gradiente y patrones periódicos **bloqueados**; caras invertidas o giradas y fondos con textura **pasan** | La caricidad EBGM (bunch graph de 49 caras) no separa caras no vistas de esas texturas. En el pipeline completo las para el detector |
+| A2 No-caras por `_sd` | ⚠️ PARCIAL: plano, ruido, gradiente y patrones periódicos **bloqueados**; caras invertidas o giradas y fondos con textura **pasan**. Medido con las 232 no-caras de calibración: 125 pasan la caricidad y **111 salen identificadas como alguien** (108 con la agregación anterior: no es efecto de la ronda 6) | La caricidad EBGM (bunch graph de 49 caras) no separa caras no vistas de esas texturas. En el pipeline completo las para el detector |
 | A3 Templates basura por `_t` (NaN, ceros, negativos, enormes, forma errónea, aleatorios, tipos raros) | ✅ 8/8 bloqueados | Validación + caricidad |
 | A4 *Hill-climbing* con la configuración entregada | ✅ bloqueado: por defecto solo se devuelve la decisión, sin similitudes | — |
 | A4b *Hill-climbing* si se activa `exponer_puntuaciones=True` | ⚠️ VULNERABLE: forja un template aceptado en ~300 consultas | Ese modo es solo para evaluación; añadir un límite de intentos |

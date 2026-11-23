@@ -222,8 +222,19 @@ VARIANTES = {
     "R4 fid+s.75+var8": dict(preproceso="clahe", n_escalas=7, grafo="fiducial",
                              sigma_rel=0.75, simetrizar=False, variaciones_inscripcion=8),
     # ---- 5ª ronda: invariancia a espejo en el matcher (por defecto desde aquí)
-    "R5 FINAL (defecto)": dict(),
-    "R5 FINAL sin invariancia espejo": dict(invariante_espejo=False),
+    "R5 FINAL (defecto)": dict(agregacion="media"),
+    "R5 FINAL sin invariancia espejo": dict(agregacion="media", invariante_espejo=False),
+    # ---- 6ª ronda (rama fernando): agregación robusta de los nodos. Probado
+    # y DESCARTADO en esta ronda (scratch, no versionado): T-norm con la
+    # cohorte (peor), pesos de Fisher por nodo aprendidos de los aumentos (sin
+    # efecto) o del cigala (mejoran, pero bajan los ojos por sus gafas de sol
+    # y suben boca/mentón por su barba: son pesos de UNA persona), WCCN por
+    # nodo (+1-3 puntos, ruidoso) y aumentos de pose para WCCN (peor).
+    "R6 mitad + quita 6": dict(agregacion="mitad_recortada", nodos_descartados=6),
+    "R6 mejor mitad (sin recortar)": dict(agregacion="mitad_recortada", nodos_descartados=0),
+    "R6 mitad + quita 2": dict(agregacion="mitad_recortada", nodos_descartados=2),
+    "R6 FINAL mitad + quita 3 (defecto)": dict(),
+    "R6 mitad + quita 4": dict(agregacion="mitad_recortada", nodos_descartados=4),
 }
 
 
@@ -245,7 +256,7 @@ def main():
            f"{'EER_aug':>8s} {'dp_aug':>7s} {'R1_aug':>7s} {'TAR@1%':>7s} {'ms':>6s}")
     print(cab); print("-" * len(cab))
     for n in nombres:
-        base = {} if n.startswith("R5") else BASE_RONDAS_1_4
+        base = {} if n.startswith(("R5", "R6")) else BASE_RONDAS_1_4
         cfg = replace(ConfigEBGM(), **{**base, **VARIANTES[n]})
         r = evaluar_config(cfg, datos)
         print(f"{n:50s} {r['EER_cig']*100:7.1f}% {r['dp_cig']:7.2f} {r['R1_cig']*100:6.1f}% "

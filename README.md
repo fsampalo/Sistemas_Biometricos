@@ -132,32 +132,36 @@ umbrales) es común a todas las identidades. El Cigala se inscribe como el
 pares ordenados entre las 13 fotos del Cigala (caso real «1 foto inscrita») y 392
 fotos degradadas de los famosos. Impostores: famosos entre sí y Cigala contra famosos.
 
-| Ajuste (1 foto inscrita) | EBGM inicial (5 escalas, rejilla 9×8) | **EBGM final** |
-|---|---|---|
-| EER del Cigala | 34,6 % | **14,1 %** |
-| d' del Cigala | 0,65 | **2,01** |
-| Rank-1 del Cigala (galería de 50) | 19 % | **46 %** |
-| TAR @ FAR 1 % del Cigala | 2,6 % | **34,6 %** |
-| EER de las degradaciones | 4,6 % | **0,3 %** |
-| Rank-1 de fotos en espejo | — | **98 %** (71 % sin invariancia) |
+| Ajuste (1 foto inscrita) | EBGM inicial (5 escalas, rejilla 9×8) | EBGM ronda 5 (media de nodos) | **EBGM final (ronda 6)** |
+|---|---|---|---|
+| EER del Cigala | 34,6 % | 14,1 % | **12,8 %** |
+| d' del Cigala | 0,65 | 2,01 | **2,14** |
+| Rank-1 del Cigala (galería de 50) | 19 % | 46 % | **51 %** |
+| TAR @ FAR 1 % del Cigala | 2,6 % | 34,6 % | **41,7 %** |
+| EER de las degradaciones | 4,6 % | 0,3 % | **0,3 %** |
+| Rank-1 de fotos en espejo | — | 98 % (71 % sin invariancia) | **98 %** |
 
 Lo que más aportó: **7 escalas** (las escalas grandes capturan la forma de la
 cara), **CLAHE** (mejor que Tan-Triggs), **grafo fiducial** y **matcher
-invariante a espejo**. Lo que se probó y **se descartó** por no mejorar:
+invariante a espejo** y, en la ronda 6, la **agregación robusta de nodos**
+(la mejor media cara, descartando sus 3 nodos peores: aguanta giros de cabeza
+y oclusiones parciales). Lo que se probó y **se descartó** por no mejorar:
 Tan-Triggs, simetrizar el template, rejilla densa, término de geometría,
 compresión logarítmica, 8 escalas, 12 orientaciones y micro-variaciones al
-inscribir (están implementados y se pueden activar en `ConfigEBGM`).
+inscribir (están implementados y se pueden activar en `ConfigEBGM`); y en la
+ronda 6, T-norm con la cohorte, pesos por nodo aprendidos (los del Cigala solo
+reflejan sus gafas y su barba) y WCCN por nodo.
 
 ## Resultados (fase 2) — `python evaluar.py`
 
-Sistema desplegado: umbral **0,231** (FAR objetivo 1 %).
+Sistema desplegado: umbral **0,327** (FAR objetivo 1 %).
 
 | Métrica | Resultado |
 |---|---|
 | FTA del detector | 0/49 famosos, 0/13 refs. del Cigala, 2/7 fotos de test (fotos de concierto con caras de ~20 px) |
 | Test del Cigala vs Cigala inscrito | **5/5 aceptadas**, rank-1 **100 %**, d' 5,4 |
-| Test del Cigala vs **1 sola foto** | EER 15 %, d' 1,9, TAR@FAR1 % ≈ 25 % |
-| FAR real en el umbral desplegado | 1,3 % |
+| Test del Cigala vs **1 sola foto** | EER 12,4 %, d' 2,0, TAR@FAR1 % ≈ 38 % (antes de la ronda 6: 15 %, 1,9, 25 %) |
+| FAR real en el umbral desplegado | 1,2 % |
 | Robustez (iluminación, baja resolución, JPEG 15, giro 12°, ruido, luz lateral) | **100 %** rank-1 y verificación |
 | Robustez espejo | 98 % |
 | Tiempo `verificar` / `identificar` (foto) | ~50 ms |

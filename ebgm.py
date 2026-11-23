@@ -100,6 +100,15 @@ class ConfigEBGM:
     peso_geometria: float = 0.0        # peso del término de geometría del grafo
     variaciones_inscripcion: int = 0   # micro-variaciones promediadas al inscribir (0..8)
     invariante_espejo: bool = True     # similitud = max(directa, con la sonda reflejada)
+    # Cómo se agregan las similitudes de los nodos (ronda 6 de ajuste_ebgm.py):
+    #   "media":            media de todos los nodos (EBGM clásico)
+    #   "mitad_recortada":  la mejor de las dos medias caras (izq./dcha. + eje
+    #                       central), descartando en cada una los
+    #                       `nodos_descartados` nodos peores. Robusto a giros de
+    #                       cabeza (un lado se ve peor) y a oclusiones parciales
+    #                       (gafas, pelo, barba) sin aprender nada de nadie.
+    agregacion: str = "mitad_recortada"
+    nodos_descartados: int = 3
 
     @property
     def n_filtros(self) -> int:
@@ -273,6 +282,11 @@ class ExtractorEBGM:
         self._perm_nodos = _permutacion_espejo(self.pos0, self.cfg.tam_cara)
         self._perm_filtros = _permutacion_orientaciones(self.cfg)
         self.pesos = np.ones(self.n_nodos, np.float32) / self.n_nodos
+        # medias caras para la agregación robusta: lado + eje central
+        cx = (self.cfg.tam_cara - 1) / 2.0
+        x = self.pos0[:, 0]
+        centro = np.abs(x - cx) <= 1.0
+        self._mitades = [np.flatnonzero((x < cx) | centro), np.flatnonzero((x > cx) | centro)]
         # desplazamientos candidatos del ajuste elástico
         r, p = self.cfg.radio_elastico, max(1, self.cfg.paso_elastico)
         d = [(dx, dy) for dy in range(-r, r + 1, p) for dx in range(-r, r + 1, p)
@@ -521,8 +535,22 @@ class ExtractorEBGM:
             r = r + self._rep_simple(self.reflejar(t))
         return r
 
+    def _agregar(self, S: np.ndarray) -> np.ndarray:
+        """(k, n_nodos) similitudes por nodo -> (k,) similitud del grafo."""
+        modo = self.cfg.agregacion
+        if modo == "media":
+            return S @ self.pesos
+        if modo == "mitad_recortada":
+            q = self.cfg.nodos_descartados
+            mejores = []
+            for idx in self._mitades:
+                m = np.sort(S[:, idx], axis=1)
+                mejores.append(m[:, min(q, len(idx) - 1):].mean(axis=1))
+            return np.maximum(*mejores)
+        raise ValueError(f"agregacion desconocida: {modo}")
+
     def _nucleo(self, ja, ga, J, G) -> np.ndarray:
-        s = np.einsum("nf,knf->kn", ja, J) @ self.pesos
+        s = self._agregar(np.einsum("nf,knf->kn", ja, J))
         if self.cfg.peso_geometria > 0:
             s = s - self.cfg.peso_geometria * np.sqrt(
                 np.mean(np.sum((G - ga) ** 2, axis=2), axis=1))

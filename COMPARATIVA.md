@@ -58,8 +58,24 @@ es el diseño y, sobre todo, la evaluación.
 
 Resultado de `python evaluar_ataques.py`: **16 de 23 ataques bloqueados**
 (antes 13 de 22), y los 7 restantes son vulnerabilidades conocidas y documentadas.
-Rendimiento (`evaluar.py`) y demo sin cambios: umbral 0,2314 y el Cigala de
-test aceptado.
+## 4b. Mejora del modelo (ronda 6, sin datos nuevos)
+
+Sin añadir fotos (las de los famosos son comunes a todos los equipos), solo
+cambiando el matcher. Ajustado con `ajuste_ebgm.py`, **sin tocar el test**:
+
+| Probado | Resultado en ajuste | Decisión |
+|---|---|---|
+| T-norm con la cohorte | EER 14,1 → 14,7 % | descartado |
+| Pesos de Fisher por nodo (de los aumentos) | sin efecto | descartado |
+| Pesos de Fisher por nodo (del Cigala, validación cruzada) | TAR 34,6 → 40–44 % | descartado: bajan los ojos (gafas de sol) y suben boca/mentón (barba). Son pesos de UNA persona |
+| WCCN por nodo (de los aumentos) | TAR +1–3 puntos, ruidoso | descartado |
+| WCCN con aumentos de pose | peor | descartado |
+| **Mejor media cara, sin sus 3 nodos peores** | **EER 12,8 %, d' 2,14, rank-1 51 %, TAR 41,7 %** | **adoptado** (`ConfigEBGM.agregacion`) |
+
+Test reservado (fotos nuevas del Cigala contra 1 sola foto inscrita), medido
+una vez al final: **TAR a FAR 1 % 24,6 → 38,5 %**, EER 15,1 → 12,4 %, d' 1,86 →
+1,99. Con el template medio, sigue en 5/5 y rank-1 100 %. FAR real 1,2 %. Nuevo
+umbral 0,327. Ataques: siguen 16/23 bloqueados.
 
 ## 5. Ideas de Anguita que no se han incorporado
 
