@@ -1,12 +1,12 @@
 # Reconocimiento facial EBGM — Sistemas Biométricos
 
-Práctica de la asignatura. El sistema de reconocimiento facial usa como método
+El sistema de reconocimiento facial usa como método 
 **EBGM (Elastic Bunch Graph Matching)**: un grafo de nodos fiduciales sobre la
 cara, jets de Gabor en cada nodo, un *Face Bunch Graph* para ajustar el grafo a
 cada cara y un emparejamiento de grafos para comparar.
 
 Nuestro famoso elegido es **El Cigala**. La BD tiene **50 personas**: los 49
-famosos del docente (`datos/Dataset.tar.gz`) más el Cigala.
+famosos de `datos/Dataset.tar.gz` más el Cigala.
 
 ### Fotos: hay más fotos que personas, pero cada persona se inscribe con UNA
 
