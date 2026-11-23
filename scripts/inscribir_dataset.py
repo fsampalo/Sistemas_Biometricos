@@ -5,13 +5,16 @@ Crea el sistema listo para usar:
      con la cohorte de los 49 famosos comunes -> models/ebgm_modelo.npz
   2. Inscribe a las 50 personas conocidas en la BD (.csv):
        - los 49 famosos del docente (Dataset/, 1 foto cada uno)
-       - nuestro famoso: EL CIGALA, como template medio de sus fotos de
-         referencia (fotos_cigala/). Sigue siendo 1 template por persona.
+       - nuestro famoso: EL CIGALA, también con UNA sola foto: la más
+         foto de fotos_cigala/ (si hubiera varias, la más representativa: la
+         que más se parece de media a las demás). Sus demás fotos están en
+         fotos_cigala_test/ y solo se usan para evaluar.
   3. Calibra los umbrales -> models/calibracion.json
        - umbral de decisión: el que da un FAR objetivo (por defecto 1 %) en los
          pares impostores disponibles (famoso vs famoso, cigala vs famosos).
        - umbral de "caricidad": separa caras reales NO vistas por el modelo
-         (fotos del cigala) de entradas que no son caras (ruido, imágenes
+         (cada famoso medido sin su propia foto en el bunch, y la foto del
+         cigala) de entradas que no son caras (ruido, imágenes
          planas, texturas, caras invertidas...).
 
 NUNCA usa fotos_cigala_test/ (reservado para la evaluación final).
@@ -85,6 +88,9 @@ def main():
     p = argparse.ArgumentParser(description="Entrena el modelo EBGM e inscribe famosos + cigala")
     p.add_argument("--dataset", default=DIR_DATASET)
     p.add_argument("--cigala-dir", default=DIR_CIGALA)
+    p.add_argument("--foto-cigala", default=None,
+                   help="nombre del fichero de fotos_cigala/ con el que inscribir al cigala "
+                        "(por defecto, la foto más representativa)")
     p.add_argument("--bd", default=RUTA_BD_POR_DEFECTO)
     p.add_argument("--far-objetivo", type=float, default=0.01,
                    help="FAR objetivo para fijar el umbral de decisión")
@@ -110,12 +116,26 @@ def main():
     # para calibrar se usan templates de SONDA (como llegan en verificar/identificar)
     sonda_fam = [ext.extraer(c) for c in caras_fam]
 
-    # ------------------------------------------------ 2) cigala (template medio)
-    caras_cig, _, _ = caras_de(det, sorted(glob.glob(os.path.join(a.cigala_dir, "*"))))
+    # ------------------------------------------------ 2) cigala (UNA foto)
+    caras_cig, rutas_cig, _ = caras_de(det, sorted(glob.glob(os.path.join(a.cigala_dir, "*"))))
     tpl_cig_fotos = [ext.extraer(c) for c in caras_cig]
     if not tpl_cig_fotos:
         raise SystemExit("No se pudo extraer ninguna foto del cigala")
-    tpl_cigala = ext.promediar(tpl_cig_fotos)
+    nombres_cig = [os.path.basename(r) for r in rutas_cig]
+    if a.foto_cigala:
+        if a.foto_cigala not in nombres_cig:
+            raise SystemExit(f"{a.foto_cigala} no está en {a.cigala_dir} (o no tiene cara)")
+        k_cig = nombres_cig.index(a.foto_cigala)
+    elif len(tpl_cig_fotos) == 1:
+        k_cig = 0
+    else:
+        # la foto más representativa: mayor similitud media con las demás
+        reps = [ext.representar(t) for t in tpl_cig_fotos]
+        medias = [np.mean([ext.similitud_rep(reps[j], reps[i])
+                           for j in range(len(reps)) if j != i]) for i in range(len(reps))]
+        k_cig = int(np.argmax(medias))
+    foto_cigala = nombres_cig[k_cig]
+    tpl_cigala = ext.extraer_inscripcion(caras_cig[k_cig])   # igual que los famosos
 
     # ------------------------------------------------ 3) calibración
     # galería = templates de inscripción; sonda = templates normales
@@ -130,11 +150,22 @@ def main():
     imp = np.sort(np.array(imp))
     umbral = float(np.quantile(imp, 1 - a.far_objetivo))
     gen = [S(son_c[i], gal_c[j]) for i in range(nc) for j in range(nc) if i != j]
-    frr = float(np.mean(np.array(gen) < umbral))
+    frr = float(np.mean(np.array(gen) < umbral)) if gen else None   # con 1 foto no hay pares
 
-    # Caricidad: SOLO caras no vistas por el modelo (fotos del cigala; los
-    # famosos están en el bunch y puntuarían alto de forma optimista).
-    car_caras = np.array([ext.puntuacion_cara(t) for t in tpl_cig_fotos])
+    # Caricidad: SOLO caras no vistas por el modelo. Los famosos están en el
+    # bunch y puntuarían alto de forma optimista, así que cada uno se mide
+    # SIN su propia foto (ni su espejo) en el bunch (leave-one-out); y las
+    # fotos del cigala, que el modelo no ha visto.
+    F = ext.cfg.n_filtros
+    n_fam = len(caras_fam)
+
+    def caricidad_sin(tpl, excluir):
+        j = ext._l2(ext._comprimir(tpl[:, :F]))
+        bunch = np.delete(ext.modelo.bunch, excluir, axis=0)
+        return float(np.einsum("nf,bnf->bn", j, bunch).max(axis=0).mean())
+
+    car_caras = np.array([caricidad_sin(t, [i, i + n_fam]) for i, t in enumerate(sonda_fam)]
+                         + [ext.puntuacion_cara(t) for t in tpl_cig_fotos])
     imgs = [det.cargar_imagen(r) for r in rutas_ok]
     nc = no_caras(caras_fam, imgs)
     car_no = np.array([ext.puntuacion_cara(ext.extraer(x)) for _, x in nc])
@@ -146,11 +177,12 @@ def main():
         por_cat.setdefault(cat, []).append(v >= umbral_cara)
     cal = {"umbral": round(umbral, 5), "umbral_cara": round(umbral_cara, 5),
            "far_objetivo": a.far_objetivo,
-           "frr_estimado_cigala_1foto": round(frr, 4),
+           "frr_estimado_cigala_1foto": None if frr is None else round(frr, 4),
            "caricidad_caras_min": round(float(car_caras.min()), 4),
            "caricidad_no_caras_max": round(float(car_no.max()), 4),
            "no_caras_que_pasan_por_categoria": {k: f"{sum(v)}/{len(v)}" for k, v in por_cat.items()},
-           "n_impostores": int(len(imp)), "n_genuinos": int(len(gen))}
+           "n_impostores": int(len(imp)), "n_genuinos": int(len(gen)),
+           "foto_inscripcion_cigala": foto_cigala}
     # los umbrales viajan DENTRO del modelo (protegido por el HMAC de la BD)
     modelo.info.update(umbral=cal["umbral"], umbral_cara=cal["umbral_cara"],
                        far_objetivo=a.far_objetivo)
@@ -158,8 +190,8 @@ def main():
     os.makedirs(os.path.dirname(RUTA_CALIBRACION), exist_ok=True)
     with open(RUTA_CALIBRACION, "w", encoding="utf-8") as f:
         json.dump(cal, f, indent=2)
-    print(f"[calibración] umbral={umbral:.4f} (FAR objetivo {a.far_objetivo:.1%}; "
-          f"FRR 1 foto cigala ≈ {frr:.0%})")
+    print(f"[calibración] umbral={umbral:.4f} (FAR objetivo {a.far_objetivo:.1%}"
+          + (f"; FRR 1 foto cigala ≈ {frr:.0%})" if frr is not None else ")"))
     print(f"[calibración] caricidad: caras reales no vistas min={car_caras.min():.3f} "
           f"-> umbral_cara={umbral_cara:.3f}")
     print("[calibración] entradas NO-cara que el control deja pasar (límite conocido de _sd/_t):")
@@ -176,8 +208,8 @@ def main():
     sis.inscribir_t("cigala", tpl_cigala)
     sis.auditoria = True
     sis._auditar("bd_creada", n=len(sis.personas()))
-    print(f"[cigala] template medio de {len(tpl_cig_fotos)} fotos de "
-          f"{os.path.relpath(a.cigala_dir, RAIZ)}")
+    print(f"[cigala] inscrito con UNA foto: {os.path.relpath(a.cigala_dir, RAIZ)}/{foto_cigala}"
+          + (f" (la más representativa de {len(tpl_cig_fotos)})" if len(tpl_cig_fotos) > 1 else ""))
     print(f"\nInscritas {len(sis.personas())} personas en {os.path.relpath(a.bd, RAIZ)}")
     if fallos:
         print(f"No se pudieron procesar {len(fallos)}:")

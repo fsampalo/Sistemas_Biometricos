@@ -8,6 +8,20 @@ cada cara y un emparejamiento de grafos para comparar.
 Nuestro famoso elegido es **El Cigala**. La BD tiene **50 personas**: los 49
 famosos del docente (`datos/Dataset.tar.gz`) más el Cigala.
 
+### Fotos: hay más fotos que personas, pero cada persona se inscribe con UNA
+
+El enunciado limita las **personas inscritas**, no las fotos del repositorio.
+La BD tiene **una fila (un template) por persona**, y **cada persona, también
+el Cigala, se inscribe con una sola foto**. El resto de fotos no se inscribe:
+
+| Carpeta | Fotos | Uso |
+|---|---|---|
+| `datos/Dataset/` | 49 | 1 por famoso: es su foto de inscripción |
+| `datos/fotos_cigala/` | **1** (`8.jpg`) | La foto de inscripción del Cigala |
+| `datos/fotos_cigala_test/` | 19 | **Solo para pruebas**, nunca se inscriben: 7 fotos **nuevas** (conciertos y otras épocas) y 12 `ref_*.jpg`, que se usaron para **ajustar** la configuración en la fase 1. La evaluación informa de los dos grupos por separado |
+
+Así el Cigala está en las mismas condiciones que los 49 famosos.
+
 ```
 foto -> [DETECTOR YuNet] -> cara 112x112 alineada -> [EXTRACTOR EBGM] -> template -> [MATCHER EBGM] -> BD (.csv)
 ```
@@ -131,14 +145,14 @@ python -m reconocimiento.sistema listar
    sonda y se toma el máximo.
 
 El **modelo** (`models/ebgm_modelo.npz`: manojo, media/desviación de la cohorte y
-umbrales) es común a todas las identidades. El Cigala se inscribe como el
-**template medio** de sus 13 fotos de referencia (1 template, igual que el resto).
+umbrales) es común a todas las identidades. Todas las personas, el Cigala
+incluido, se inscriben con **una sola foto** (1 template por persona).
 
 ### Cómo se eligió la configuración (fase 1)
 
 `python scripts/ajuste_ebgm.py` compara variantes **sin tocar el test**
-(`datos/fotos_cigala_test/` solo se usa en `scripts/evaluar.py`). Genuinos de
-ajuste: los 156 pares ordenados entre las 13 fotos del Cigala (caso real «1 foto
+(las 7 fotos nuevas de `datos/fotos_cigala_test/` solo se usan para evaluar). Genuinos de
+ajuste: los 156 pares ordenados entre 13 fotos del Cigala (la de inscripción y las 12 `ref_*`; caso real «1 foto
 inscrita») y 392 fotos degradadas de los famosos. Impostores: famosos entre sí y
 Cigala contra famosos.
 
@@ -165,19 +179,43 @@ Sistema desplegado: umbral **0,327** (FAR objetivo 1 %).
 
 | Métrica | Resultado |
 |---|---|
-| FTA del detector | 0/49 famosos, 0/13 refs. del Cigala, 2/7 fotos de test (fotos de concierto con caras de ~20 px) |
-| Test del Cigala vs Cigala inscrito | **5/5 aceptadas**, rank-1 **100 %**, d' 5,3 |
-| Test del Cigala vs **1 sola foto** | EER 12,4 %, d' 2,0, TAR@FAR1 % ≈ 38 % |
-| FAR real en el umbral desplegado | 1,2 % |
+| FTA del detector | 0/49 famosos, 2/19 fotos de test del Cigala (fotos de concierto con caras de ~20 px) |
+| Fotos de test del Cigala vs el Cigala de la BD (1 foto) | **9–10 de 17 aceptadas** (según la versión de OpenCV); rank-1 65 %, **rank-5 94 %**; 4/17 identificadas como otra persona |
+| … solo las 5 **nuevas** (nunca usadas al ajustar) | **1–2 de 5 aceptadas** (una cae justo en el umbral: 1/5 con OpenCV 5, 2/5 en Docker con OpenCV 4); rank-1 20 %, rank-5 80 % |
+| … solo las 12 `ref_*` (usadas al ajustar) | 8 de 12 aceptadas; rank-1 83 %, rank-5 100 % |
+| Protocolo «1 foto vs 1 foto» (272 pares entre fotos de test) | EER 13,6 %, d' 2,0, **TAR@FAR1 % = 41 %** |
+| FAR real en el umbral desplegado | 1,0 % |
 | Robustez (iluminación, baja resolución, JPEG 15, giro 12°, ruido, luz lateral) | **100 %** rank-1 y verificación |
 | Robustez espejo | 98 % |
 | Tiempo `verificar` / `identificar` (foto) | ~100 ms (`_t` < 1 ms) |
 
-**Lectura honesta.** Con varias fotos de inscripción el sistema reconoce muy
-bien. Con **una sola foto** (el caso de los 49 famosos) y fotos muy distintas
-(otra década, perfil, gafas de sol), EBGM, que es un método clásico, se queda en
-un TAR de ~40 % a FAR 1 %: una foto nueva de un famoso muy distinta de la del
-Dataset tiene bastante probabilidad de ser rechazada.
+**Lectura honesta.** Con **una sola foto inscrita** por persona y fotos nuevas
+muy distintas (otro evento, otra década, perfil, gafas de sol), EBGM, que es un
+método clásico, se queda en un TAR de ~40 % a FAR 1 %: una foto nueva de un
+famoso tiene bastante probabilidad de ser rechazada, y alguna de ser confundida
+con otra persona. La persona correcta suele estar entre las 5 primeras
+(rank-5 80 % en el test del Cigala), pero no siempre la primera. Frente a
+cambios de captura de la misma foto (luz, resolución, compresión, ruido, giro)
+el sistema es muy robusto.
+
+## Gráficas — `python scripts/graficas.py`
+
+Genera 9 figuras en `salida/graficas/` con la BD y el umbral reales
+(distribuciones, curva DET, fotos de test, CMC, robustez, parejas confundibles,
+evolución del ajuste, grafo EBGM y banco de Gabor). Con Docker, montando
+`salida/` para recogerlas (PowerShell):
+
+```powershell
+docker run --rm -v "${PWD}/salida:/app/salida" ebgm python scripts/graficas.py
+```
+
+| | |
+|---|---|
+| ![Distribuciones](salida/graficas/01_distribuciones.png) | ![Curva DET](salida/graficas/02_det.png) |
+| ![Fotos de test](salida/graficas/03_fotos_test.png) | ![CMC](salida/graficas/04_cmc.png) |
+| ![Ajuste](salida/graficas/07_ajuste.png) | ![Parejas](salida/graficas/06_parejas.png) |
+
+![Grafo EBGM](salida/graficas/08_grafo.png)
 
 ## Seguridad — `python scripts/evaluar_ataques.py`
 
@@ -207,14 +245,15 @@ CONOCIDAS**, cada una con su mitigación (detalle en [`docs/INFORME.md`](docs/IN
 │   ├── demo.py                #   demostración de los 9 métodos
 │   ├── ajuste_ebgm.py         #   fase 1: experimentos de ajuste
 │   ├── evaluar.py             #   fase 2: métricas del sistema desplegado
-│   └── evaluar_ataques.py     #   fase 2: ataques
+│   ├── evaluar_ataques.py     #   fase 2: ataques
+│   └── graficas.py            #   figuras del sistema -> salida/graficas/
 ├── datos/
 │   ├── Dataset/ (+ .tar.gz)   #   49 famosos del docente
-│   ├── fotos_cigala/          #   13 fotos de referencia del Cigala (inscripción)
-│   ├── fotos_cigala_test/     #   7 fotos NUEVAS del Cigala (solo evaluación)
+│   ├── fotos_cigala/          #   1 foto: la de inscripción del Cigala
+│   ├── fotos_cigala_test/     #   19 fotos solo para pruebas (7 nuevas + 12 ref_*)
 │   └── bd_sistema.csv (+.mac) #   la BD (generada, no versionada)
 ├── models/                    # YuNet, ebgm_modelo.npz, calibracion.json (+ clave_bd.key generada)
-├── salida/                    # det.png, auditoria.log, caché del ajuste
+├── salida/                    # graficas/, auditoria.log, caché del ajuste
 ├── docs/INFORME.md            # informe de las fases 1 y 2
 ├── Dockerfile
 └── requirements.txt

@@ -5,7 +5,7 @@ numpy>=1.24,<3
 pillow>=11.3
 # Opcional: fotos HEIC de iPhone
 pillow-heif>=0.18
-# Solo para la figura DET de evaluar.py (opcional)
+# Gráficas (scripts/graficas.py)
 matplotlib>=3.7
 # Cifrado en reposo de los templates de la BD (AES-256-GCM)
 cryptography>=42

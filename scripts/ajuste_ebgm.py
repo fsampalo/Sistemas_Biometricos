@@ -9,9 +9,12 @@ Datos de ajuste
   * Famosos del docente (Dataset/, 1 foto por persona): impostores reales y,
     con AUMENTOS sintéticos de cada foto (iluminación, desenfoque, JPEG, giro,
     espejo, ruido, luz lateral), genuinos "de captura".
-  * Fotos de referencia del cigala (fotos_cigala/, 13): todos los PARES entre
-    ellas son genuinos reales con 1 sola foto inscrita (pose, gafas, 20 años
-    de diferencia...), que es el caso real de los 49 famosos.
+  * Las 13 fotos del cigala con las que se ajustó la configuración: la de
+    inscripción (fotos_cigala/) y las 12 `ref_*` que ahora están en
+    fotos_cigala_test/. Todos los PARES entre ellas son genuinos reales con 1
+    sola foto inscrita (pose, gafas, 20 años de diferencia...), que es el caso
+    real de los 49 famosos. Por eso evaluar.py separa esas 12 (vistas en el
+    ajuste) de las 7 fotos de test que nunca se usaron para ajustar.
 
 Métricas que se imprimen por configuración
 ------------------------------------------
@@ -43,7 +46,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
 
 from reconocimiento.detector import DetectorCaras, ErrorDeteccion
 from reconocimiento.ebgm import ConfigEBGM, ExtractorEBGM
-from reconocimiento.rutas import DIR_CIGALA, DIR_DATASET, DIR_SALIDA
+from reconocimiento.rutas import DIR_CIGALA, DIR_CIGALA_TEST, DIR_DATASET, DIR_SALIDA
 
 CACHE = os.path.join(DIR_SALIDA, "cache_caras_ajuste.npz")
 
@@ -91,9 +94,9 @@ def construir_cache(forzar: bool = False) -> dict:
             except ErrorDeteccion:
                 pass
 
-    def carpeta(c):
+    def carpeta(c, patron="*"):
         caras, nombres = [], []
-        for ruta in sorted(glob.glob(os.path.join(c, "*"))):
+        for ruta in sorted(glob.glob(os.path.join(c, patron))):
             try:
                 caras.append(det.extraer_cara(ruta)); nombres.append(os.path.basename(ruta))
             except ErrorDeteccion:
@@ -101,6 +104,8 @@ def construir_cache(forzar: bool = False) -> dict:
         return caras, nombres
 
     cig, cig_n = carpeta(DIR_CIGALA)
+    cig2, cig_n2 = carpeta(DIR_CIGALA_TEST, "ref_*")   # las de ajuste que están en test
+    cig, cig_n = cig + cig2, cig_n + cig_n2
     d = dict(fam=np.stack(fam), fam_id=np.array(fam_id), aug=np.stack(aug),
              aug_id=np.array(aug_id), aug_tipo=np.array(aug_tipo),
              cig=np.stack(cig), cig_n=np.array(cig_n))

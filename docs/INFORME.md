@@ -18,7 +18,7 @@ reproducir (sección 6).
 | Python | ✅ |
 | Repositorio fácil de ejecutar + **Docker** | ✅ `docker build -t ebgm . && docker run --rm ebgm` arranca con la BD lista |
 | BD en **.csv** | ✅ `datos/bd_sistema.csv`: `id,template,mac` (+ `.mac`); templates cifrados |
-| Personas inscritas | ✅ **50** = 49 famosos del `Dataset.tar.gz` + **El Cigala**. (El enunciado dice 50+1; el comprimido trae 49.) |
+| Personas inscritas | ✅ **50** = 49 famosos del `Dataset.tar.gz` + **El Cigala**, **cada uno con una sola foto** (1 template por persona) |
 | 9 métodos (`inscribir/verificar/identificar` × normal, `_sd`, `_t`) | ✅ probados en `scripts/demo.py`, coherentes entre variantes |
 | Evaluación con ataques (saltar partes, leer BD, escribir BD) | ✅ `scripts/evaluar_ataques.py`: 23 ataques ejecutados |
 
@@ -78,6 +78,19 @@ medido en el ajuste):
 Con **una sola foto por persona** y un método de características diseñadas a
 mano, el margen de mejora restante sin más datos es pequeño.
 
+### 2.3 Inscripción: una foto por persona
+Todas las personas se inscriben con **una sola foto**, también el Cigala, para
+que esté en las mismas condiciones que los 49 famosos: `datos/fotos_cigala/`
+contiene solo su foto de inscripción (`8.jpg`, la más representativa de sus 13
+fotos de referencia). Las otras 12 se movieron a `datos/fotos_cigala_test/` con
+el prefijo `ref_` para tener más fotos de prueba; como se usaron para elegir la
+configuración en la fase 1, la evaluación las separa de las 7 fotos **nuevas**,
+que nunca se han usado para ajustar.
+
+Inscribir al Cigala con la media de sus fotos lo reconocería mucho mejor, pero
+no sería comparable con el resto ni con lo que el rival encontrará con los
+famosos, así que se descartó.
+
 ---
 
 ## 3. Fase 2 — Evaluación del rendimiento (`scripts/evaluar.py`)
@@ -87,22 +100,23 @@ Sistema **desplegado** (BD real, umbral 0,327 calibrado a FAR 1 %).
 ### 3.1 Lo que FUNCIONA
 | Prueba | Resultado |
 |---|---|
-| 5 fotos NUEVAS del Cigala vs Cigala inscrito | **5/5 aceptadas**, rank-1 **100 %** (azar 2 %), d' 5,3 |
 | Fotos degradadas de los 49 famosos (oscura, clara, baja resolución, JPEG calidad 15, giro 12°, ruido, luz lateral) | **100 %** rank-1 y verificación |
 | Fotos en espejo (selfie) | 98 % |
-| FAR real en el umbral desplegado | 1,2 % (1470 pares impostores) |
-| El template medio del Cigala **no es un «imán»** | atracción top-3 0,31, por debajo del umbral |
+| FAR real en el umbral desplegado | 1,0 % (2058 pares impostores) |
+| El Cigala **no es un «imán»** de falsos positivos | atracción top-3 0,26, por debajo del umbral |
+| Identificación con una foto nueva | la persona correcta suele estar entre las 5 primeras: rank-5 94 % en las 17 fotos de test del Cigala (80 % en las 5 nuevas; azar 10 %) |
 | Velocidad | ~100 ms por foto; `_sd` ~50 ms; `_t` < 1 ms |
 
 ### 3.2 Lo que FALLA (límites conocidos del reconocimiento)
 | # | Fallo | Evidencia |
 |---|---|---|
-| R1 | Con **una sola foto inscrita** y fotos muy distintas (otra década, perfil, gafas), EBGM rechaza mucho | Test vs 1 foto: EER 12,4 %, d' 2,0, **TAR ≈ 38 % a FAR 1 %** (FRR 60 % en el umbral) |
+| R1 | Con **una sola foto inscrita** y fotos muy distintas (otro evento, otra década, perfil, gafas), EBGM rechaza mucho | Fotos de test contra el Cigala de la BD: **9–10 de 17 aceptadas** (8/12 de las `ref_*`, **1–2 de 5 de las nuevas**: una cae justo en el umbral y varía con la versión de OpenCV). Protocolo «1 foto vs 1 foto» (272 pares): EER 13,6 %, d' 2,0, **TAR 41 % a FAR 1 %** (FRR 59 % en el umbral) |
+| R1b | Una foto nueva puede **identificarse como otra persona** | 4 de 17 fotos de test del Cigala: sanisidro_07 y ref_11 como adam_pearson, sanisidro_09 como etsy_quesada, ref_3 como winnie_harlow |
 | R2 | **Gemelos**: Twin Melody, gemelos Weasley y Olsen están en el Dataset; el gemelo no inscrito pasará por el inscrito | Inherente a la biometría facial |
 | R3 | Parejas de famosos que **superan el umbral** entre sí (FAR 1 % ⇒ ~1 de cada 100 pares) | ariana_grande ~ mary-kate_olsen 0,49; ariana_grande ~ metrika 0,41; christian_bale ~ keanu_reeves 0,41 |
 | R4 | «Lobos/corderos»: ariana_grande, keanu_reeves, mary-kate_olsen y metrika atraen más impostores | Zoo de Doddington en `scripts/evaluar.py` |
-| R5 | El detector **no encuentra** caras < 40 px | 2/7 fotos de test (concierto lejano, panorámica 960×310) |
-| R6 | Las métricas de test tienen **pocas muestras** (5 fotos de 2 eventos) | El EER de test (12,4 %) y el de ajuste (12,8 %) concuerdan, pero el intervalo es amplio |
+| R5 | El detector **no encuentra** caras < 40 px | 2/19 fotos de test (concierto lejano, panorámica 960×310) |
+| R6 | Pocas fotos de test **nuevas** (5 de 2 eventos) | Las 12 `ref_*` se usaron al ajustar y salen mejor (8/12 frente a 1–2/5): las cifras de las nuevas son las más realistas, pero con un intervalo amplio |
 
 ---
 
@@ -124,7 +138,7 @@ detector; escritura atómica.
 | Ataque | Resultado | Mitigación / comentario |
 |---|---|---|
 | A1 *Replay* de un template por `verificar_t` | ⚠️ VULNERABLE (sim 1,0) | Inherente a `_t`. No exponer `_t` fuera; plantillas cancelables; canal autenticado extractor→matcher |
-| A2 No-caras por `_sd` | ⚠️ PARCIAL: plano, ruido, gradiente y patrones periódicos **bloqueados**; caras invertidas o giradas y fondos con textura **pasan**. Con las 232 no-caras de calibración: 125 pasan la caricidad y **111 salen identificadas como alguien** | La caricidad EBGM (bunch graph de 49 caras) no separa caras no vistas de esas texturas. En el pipeline completo las para el detector |
+| A2 No-caras por `_sd` | ⚠️ PARCIAL: plano, ruido, gradiente y patrones periódicos **bloqueados**; caras invertidas o giradas y fondos con textura **pasan**. Con las 232 no-caras de calibración: 120 pasan la caricidad y **100 salen identificadas como alguien** | La caricidad EBGM (bunch graph de 49 caras) no separa caras no vistas de esas texturas. En el pipeline completo las para el detector |
 | A3 Templates basura por `_t` (NaN, ceros, negativos, enormes, forma errónea, aleatorios, tipos raros) | ✅ 8/8 bloqueados | Validación + caricidad |
 | A4 *Hill-climbing* con la configuración entregada | ✅ bloqueado: por defecto solo se devuelve la decisión, sin similitudes | — |
 | A4b *Hill-climbing* si se activa `exponer_puntuaciones=True` | ⚠️ VULNERABLE: forja un template aceptado en ~300 consultas | Ese modo es solo para evaluación; añadir un límite de intentos |
@@ -169,7 +183,7 @@ detector; escritura atómica.
 
 ## 5. Pendiente
 - **Fase 3**: evaluar el sistema del grupo rival (`scripts/evaluar_ataques.py` sirve de plantilla).
-- **Fase 4**: exposición (este informe y `salida/det.png` son la base).
+- **Fase 4**: exposición (este informe y `salida/graficas/` son la base).
 
 ---
 
@@ -178,6 +192,9 @@ detector; escritura atómica.
 python scripts/inscribir_dataset.py   # modelo EBGM + 50 personas + umbrales
 python scripts/demo.py                # los 9 métodos
 python scripts/ajuste_ebgm.py         # fase 1: comparación de variantes (lento)
-python scripts/evaluar.py             # fase 2: rendimiento (+ salida/det.png)
+python scripts/evaluar.py             # fase 2: rendimiento
 python scripts/evaluar_ataques.py     # fase 2: seguridad
+python scripts/graficas.py            # figuras -> salida/graficas/
 ```
+
+Las figuras de `salida/graficas/` sirven de base para la exposición (fase 4).

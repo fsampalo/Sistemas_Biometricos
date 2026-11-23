@@ -8,10 +8,10 @@ Bloques
 -------
   1. Detector: tasa de fallo de adquisición (FTA) por conjunto.
   2. Verificación 1:1
-       - Genuinos de TEST (fotos_cigala_test/, nunca usadas al ajustar ni al
-         inscribir) contra el cigala inscrito.
-       - Protocolo "1 foto inscrita" (el caso de los 49 famosos): cada foto de
-         test contra cada foto de referencia del cigala por separado.
+       - Genuinos de TEST (fotos_cigala_test/, nunca inscritas) contra el
+         cigala de la BD (inscrito con 1 foto). Se separan las fotos NUEVAS
+         (nunca usadas al ajustar) de las ref_* (usadas para ajustar en la fase 1).
+       - Protocolo "1 foto contra 1 foto": todos los pares entre fotos de test.
        - Impostores: famoso vs famoso, famosos vs cigala inscrito, test del
          cigala vs famosos.
      -> EER, d', FAR/FRR en el umbral desplegado, TAR a FAR fijo, curva DET.
@@ -24,7 +24,7 @@ Bloques
   6. Tiempos por operación.
 
 Uso:
-    python evaluar.py                 # informe en consola + salida/det.png
+    python scripts/evaluar.py         # informe en consola (gráficas: scripts/graficas.py)
 """
 
 from __future__ import annotations
@@ -42,12 +42,17 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
 from ajuste_ebgm import aumentos, dprime, eer
 from inscribir_dataset import id_desde_fichero
 from reconocimiento.detector import DetectorCaras, ErrorDeteccion
-from reconocimiento.rutas import DIR_CIGALA, DIR_CIGALA_TEST, DIR_DATASET, DIR_SALIDA
+from reconocimiento.rutas import DIR_CIGALA_TEST, DIR_DATASET
 from reconocimiento.sistema import SistemaReconocimiento
 
 
 def titulo(t):
     print("\n" + "=" * 72 + f"\n{t}\n" + "=" * 72)
+
+
+def es_de_ajuste(nombre: str) -> bool:
+    """Fotos de test del cigala que se usaron para ajustar la configuración."""
+    return os.path.basename(nombre).startswith("ref_")
 
 
 def tar_a_far(gen, imp, far):
@@ -58,7 +63,6 @@ def tar_a_far(gen, imp, far):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--dataset", default=DIR_DATASET)
-    p.add_argument("--cigala-dir", default=DIR_CIGALA)
     p.add_argument("--cigala-test", default=DIR_CIGALA_TEST)
     p.add_argument("--sin-robustez", action="store_true", help="omite el bloque 4 (lento)")
     a = p.parse_args()
@@ -85,19 +89,22 @@ def main():
         return tpls, fallos
 
     fam, f1 = extraer_carpeta(os.path.join(a.dataset, "*"))
-    ref, f2 = extraer_carpeta(os.path.join(a.cigala_dir, "*"))
     test, f3 = extraer_carpeta(os.path.join(a.cigala_test, "*"))
-    for nombre, ok, f in (("famosos", fam, f1), ("cigala ref", ref, f2), ("cigala TEST", test, f3)):
+    for nombre, ok, f in (("famosos", fam, f1), ("cigala TEST", test, f3)):
         n = len(ok) + len(f)
         print(f"  {nombre:12s}: {len(f)}/{n} sin cara (FTA={len(f)/max(n,1):.0%})")
         for nom, e in f:
             print(f"      - {nom}: {e}")
 
     rep = {k: ext.representar(v) for k, v in fam.items()}
-    rep_ref = [ext.representar(v) for v in ref.values()]
     rep_test = {k: ext.representar(v) for k, v in test.items()}
     rep_cig_bd = sis._rep["cigala"]
     S = ext.similitud_rep
+    # las fotos ref_* se usaron para AJUSTAR la configuración (fase 1); las
+    # demás de test nunca se han usado: se informa de ambos grupos por separado
+    grupos = {"TODAS": list(rep_test),
+              "NUEVAS (nunca usadas al ajustar)": [k for k in rep_test if not es_de_ajuste(k)],
+              "de ajuste (ref_*)": [k for k in rep_test if es_de_ajuste(k)]}
 
     # ------------------------------------------------------- 2. verificación
     titulo("2. VERIFICACIÓN 1:1")
@@ -106,50 +113,34 @@ def main():
     imp_fc = [S(rep[k], rep_cig_bd) for k in kf]
     imp_tf = [S(r, rep[k]) for r in rep_test.values() for k in kf]
     imp = np.array(imp_ff + imp_fc + imp_tf)
-    gen_bd = np.array([S(r, rep_cig_bd) for r in rep_test.values()])
-    gen_1f = np.array([S(r, rr) for r in rep_test.values() for rr in rep_ref])
+    print(f"  impostores: n={len(imp)}  media={imp.mean():+.3f}  máx={imp.max():+.3f}  "
+          f"FAR en el umbral desplegado={np.mean(imp >= sis.umbral):.2%}")
 
-    print(f"  impostores: n={len(imp)}  media={imp.mean():+.3f}  máx={imp.max():+.3f}")
-    for nombre, gen in (("TEST vs cigala inscrito (template medio)", gen_bd),
-                        ("TEST vs 1 sola foto de referencia", gen_1f)):
+    def informe(nombre, gen):
+        gen = np.asarray(gen)
         if len(gen) == 0:
-            continue
+            return
         e, thr_e = eer(gen, imp)
-        far_u = float(np.mean(imp >= sis.umbral))
-        frr_u = float(np.mean(gen < sis.umbral))
         tar1, _ = tar_a_far(gen, imp, 0.01)
         print(f"\n  [{nombre}]  genuinos n={len(gen)} media={gen.mean():+.3f}")
         print(f"     d'={dprime(gen, imp):.2f}   EER={e:.1%} (umbral EER {thr_e:+.3f})")
-        print(f"     en el umbral desplegado {sis.umbral:+.3f}:  FAR={far_u:.2%}  FRR={frr_u:.1%}")
-        print(f"     TAR @ FAR=1%: {tar1:.1%}")
-    if len(gen_bd):
-        print("\n  Similitud de cada foto de TEST con el cigala inscrito:")
-        for k, r in rep_test.items():
-            s = S(r, rep_cig_bd)
-            print(f"     {k:28s} {s:+.3f}  {'ACEPTA' if s >= sis.umbral else 'rechaza'}")
+        print(f"     en el umbral desplegado {sis.umbral:+.3f}:  "
+              f"aceptadas {int(np.sum(gen >= sis.umbral))}/{len(gen)}  "
+              f"(FRR={np.mean(gen < sis.umbral):.1%})   TAR @ FAR=1%: {tar1:.1%}")
 
-    try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        os.makedirs(DIR_SALIDA, exist_ok=True)
-        fig, ax = plt.subplots(1, 2, figsize=(11, 4))
-        bins = np.linspace(min(imp.min(), gen_1f.min()), max(imp.max(), gen_bd.max()), 40)
-        ax[0].hist(imp, bins, alpha=.6, density=True, label="impostores")
-        ax[0].hist(gen_1f, bins, alpha=.6, density=True, label="genuinos (1 foto)")
-        ax[0].hist(gen_bd, bins, alpha=.8, density=True, label="genuinos (inscrito)")
-        ax[0].axvline(sis.umbral, color="k", ls="--", label="umbral")
-        ax[0].legend(); ax[0].set_xlabel("similitud EBGM")
-        thr = np.linspace(imp.min(), max(gen_1f.max(), imp.max()), 300)
-        far = np.array([(imp >= t).mean() for t in thr])
-        frr = np.array([(gen_1f < t).mean() for t in thr])
-        ax[1].loglog(np.maximum(far, 1e-4), np.maximum(frr, 1e-4))
-        ax[1].set_xlabel("FAR"); ax[1].set_ylabel("FRR"); ax[1].set_title("DET (1 foto)")
-        ax[1].grid(True, which="both", alpha=.3)
-        fig.tight_layout(); fig.savefig(os.path.join(DIR_SALIDA, "det.png"), dpi=110)
-        print("\n  Figura: salida/det.png")
-    except ImportError:
-        pass
+    for g, ks in grupos.items():
+        informe(f"TEST {g} vs cigala de la BD", [S(rep_test[k], rep_cig_bd) for k in ks])
+    # protocolo «1 foto contra 1 foto»: cada foto de test hace de inscrita y
+    # las demás de sonda (todos los pares ordenados)
+    kt = list(rep_test)
+    informe("pares entre fotos de TEST (1 foto vs 1 foto)",
+            [S(rep_test[x], rep_test[y]) for x in kt for y in kt if x != y])
+    print("\n  Similitud de cada foto de TEST con el cigala de la BD:")
+    for k, r in rep_test.items():
+        s = S(r, rep_cig_bd)
+        print(f"     {k:28s} {s:+.3f}  {'ACEPTA' if s >= sis.umbral else 'rechaza'}"
+              f"{'' if not es_de_ajuste(k) else '   (de ajuste)'}")
+    print("\n  Gráficas: python scripts/graficas.py  ->  salida/graficas/")
 
     # ----------------------------------------------------- 3. identificación
     titulo("3. IDENTIFICACIÓN 1:N (galería de 50)")
@@ -158,16 +149,22 @@ def main():
     def rango(rep_sonda, verdadero):
         s = sis._similitudes_rep(rep_sonda, ids_bd)
         orden = [ids_bd[k] for k in np.argsort(-s)]
-        return orden.index(verdadero) + 1, float(s.max())
+        return orden.index(verdadero) + 1, float(s.max()), orden[0]
 
-    rs = [rango(r, "cigala") for r in rep_test.values()]
-    if rs:
-        r1 = np.mean([r[0] == 1 for r in rs]); r5 = np.mean([r[0] <= 5 for r in rs])
-        ac = np.mean([r[0] == 1 and r[1] >= sis.umbral for r in rs])
-        print(f"  cigala TEST: rank-1={r1:.0%}  rank-5={r5:.0%}  "
-              f"(rank-1 y por encima del umbral: {ac:.0%})  [azar ≈ {1/len(ids_bd):.0%}]")
-        for (k, _), (rk, s) in zip(rep_test.items(), rs):
-            print(f"     {k:28s} rango={rk:2d}  sim_max={s:+.3f}")
+    rs = {k: rango(r, "cigala") for k, r in rep_test.items()}
+    for g, ks in grupos.items():
+        if not ks:
+            continue
+        v = [rs[k] for k in ks]
+        r1 = np.mean([r[0] == 1 for r in v]); r5 = np.mean([r[0] <= 5 for r in v])
+        ac = np.mean([r[0] == 1 and r[1] >= sis.umbral for r in v])
+        otro = np.mean([r[0] != 1 and r[1] >= sis.umbral for r in v])
+        print(f"  cigala TEST {g:34s} n={len(v):2d}  rank-1={r1:4.0%}  rank-5={r5:4.0%}  "
+              f"identificado bien={ac:4.0%}  como OTRA persona={otro:4.0%}")
+    print(f"  [azar: rank-1 ≈ {1/len(ids_bd):.0%}, rank-5 ≈ {5/len(ids_bd):.0%}]")
+    for k, (rk, s, primero) in rs.items():
+        print(f"     {k:28s} rango={rk:2d}  sim_max={s:+.3f}  "
+              f"-> {primero if s >= sis.umbral else 'nadie (bajo umbral)'}")
 
     # --------------------------------------------------------- 4. robustez
     if not a.sin_robustez:
@@ -208,7 +205,7 @@ def main():
     for k, v in top:
         print(f"     {v:+.3f}  {k}")
     print(f"  cigala: {atraccion.get('cigala', float('nan')):+.3f} "
-          "(si fuera muy alto, el template medio sería un 'imán' de falsos positivos)")
+          "(si fuera muy alto, el cigala sería un 'imán' de falsos positivos)")
     print("  Nota: el Dataset incluye GEMELOS (Twin Melody, gemelos Weasley, Olsen):")
     print("  su gemelo NO inscrito pasará casi seguro por la persona inscrita. Es un")
     print("  límite conocido de cualquier biometría facial (y más de EBGM).")
