@@ -1,0 +1,5 @@
+bd_sistema.csv -text
+bd_sistema.csv.mac -text
+models/clave_bd.key -text
+*.npz binary
+*.onnx binary

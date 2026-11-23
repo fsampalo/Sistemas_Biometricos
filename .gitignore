@@ -1,26 +1,13 @@
-# Entorno virtual
+# Entorno local (500 MB de binarios de Windows; se recrea con requirements.txt)
 .venv/
-venv/
-env/
-
-# Python
 __pycache__/
-*.py[cod]
-*.egg-info/
-.pytest_cache/
-.ipynb_checkpoints/
+*.pyc
+*.tmp
 
-# Modelos (se descargan con download_models.py)
-models/
-*.onnx
-*.part
-
-# Resultados generados por detector.py
-salida/
-
-# IDE / sistema
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
-desktop.ini
+# Secretos y artefactos generados por inscribir_dataset.py (cada despliegue
+# genera su propia clave; si se versionara, cualquiera que clone el repo
+# podría firmar y descifrar la BD)
+models/clave_bd.key
+bd_sistema.csv
+bd_sistema.csv.mac
+salida/auditoria.log
