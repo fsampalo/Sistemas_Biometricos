@@ -170,14 +170,14 @@ distinta de la del Dataset tiene bastante probabilidad de ser rechazada.
 
 ## Seguridad — `python evaluar_ataques.py`
 
-Defensas: HMAC por fila + MAC global (detecta filas alteradas, añadidas,
+Defensas: templates **cifrados en reposo** (AES-256-GCM); HMAC por fila + MAC global (detecta filas alteradas, añadidas,
 intercambiadas, borradas o restauradas); BD ligada al hash del modelo, que lleva
 dentro los umbrales; modo estricto que falla en cerrado; validación de ids
 (incluida la inyección de fórmulas CSV) y de templates; control de «caricidad»
 EBGM en `_sd`/`_t`; no sobrescritura; aviso de duplicados; auditoría
 (`salida/auditoria.log`); sha256 fijado del detector; escritura atómica.
 
-**13 de 22 ataques bloqueados**; los **9 restantes son vulnerabilidades
+**16 de 23 ataques bloqueados**; los **7 restantes son vulnerabilidades
 CONOCIDAS**, cada una con su mitigación (detalle en [`INFORME.md`](INFORME.md)).
 
 ## Estructura
@@ -195,11 +195,15 @@ CONOCIDAS**, cada una con su mitigación (detalle en [`INFORME.md`](INFORME.md))
 ├── Dataset.tar.gz         # 49 famosos del docente (no versionado)
 ├── fotos_cigala/          # 13 fotos de referencia del Cigala (inscripción)
 ├── fotos_cigala_test/     # 7 fotos NUEVAS del Cigala (solo evaluación)
-├── models/                # YuNet, ebgm_modelo.npz, calibracion.json, clave_bd.key
+├── models/                # YuNet, ebgm_modelo.npz, calibracion.json (+ clave_bd.key generada, no versionada)
 └── salida/                # det.png, auditoria.log, caché del ajuste
 ```
 
 ## Notas
+
+- La BD (`bd_sistema.csv`, `.mac`) y la clave **se generan** con
+  `python inscribir_dataset.py` (o en el `docker build`); no se versionan.
+  Comparativa de ramas y cambios de esta rama: [`COMPARATIVA.md`](COMPARATIVA.md).
 
 - `models/clave_bd.key` se genera la primera vez y **no se versiona**. En
   producción, pasa la clave por entorno: `EBGM_CLAVE_BD=<64 hex>`.

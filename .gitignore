@@ -3,3 +3,11 @@
 __pycache__/
 *.pyc
 *.tmp
+
+# Secretos y artefactos generados por inscribir_dataset.py (cada despliegue
+# genera su propia clave; si se versionara, cualquiera que clone el repo
+# podría firmar y descifrar la BD)
+models/clave_bd.key
+bd_sistema.csv
+bd_sistema.csv.mac
+salida/auditoria.log

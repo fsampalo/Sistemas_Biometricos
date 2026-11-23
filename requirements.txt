@@ -7,3 +7,5 @@ pillow>=11.3
 pillow-heif>=0.18
 # Solo para la figura DET de evaluar.py (opcional)
 matplotlib>=3.7
+# Cifrado en reposo de los templates de la BD (AES-256-GCM)
+cryptography>=42

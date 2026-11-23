@@ -218,23 +218,37 @@ def main():
     # ===================================================================== (B)
     titulo("(B) EL ATACANTE LEE LA BASE DE DATOS")
     filas = env.filas()
-    resultado("B1 exfiltración de templates", True,
-              f"{len(filas)} filas legibles (id + template en claro). El HMAC da "
-              "INTEGRIDAD, no confidencialidad. Con un template robado: replay por "
-              "_t (A1) o enlazar a la persona en otra BD EBGM con la misma config.")
     robado = filas[[f["id"] for f in filas].index(victima)]["template"]
-    r = sis.verificar_t(victima, robado)
-    resultado("B2 replay del template leído del .csv", r["verificado"],
-              f"verificar_t('{victima}', cadena_base64_del_csv) -> {r['verificado']}")
+    ok_des, _ = intento(lambda: ext.como_template(robado))
+    resultado("B1 exfiltración de templates", ok_des,
+              f"{len(filas)} filas legibles, pero la columna template va cifrada "
+              f"(AES-256-GCM, empieza por '{robado[:7]}'): "
+              f"{'¡se puede decodificar!' if ok_des else 'no es un template utilizable'}. "
+              "Los ids siguen en claro (se sabe QUIÉN está inscrito).")
+    ok, r = intento(lambda: sis.verificar_t(victima, robado))
+    resultado("B2 replay del template leído del .csv", ok and r["verificado"],
+              f"verificar_t('{victima}', celda_del_csv) -> {r if not ok else r['verificado']}")
     ruta_clave = os.path.join(AQUI, "models", "clave_bd.key")
     resultado("B3 clave HMAC legible en disco", os.path.isfile(ruta_clave)
               and not os.environ.get("EBGM_CLAVE_BD"),
               "si la clave está en models/clave_bd.key y el atacante lee el disco, "
               "puede firmar filas (ver C6). Mitigación: EBGM_CLAVE_BD en el entorno "
               "/ secreto del orquestador / HSM, fuera del alcance de quien lee la BD.")
-    resultado("B4 inversión del template a imagen", False,
-              f"el template son MAGNITUDES de Gabor en {ext.n_nodos} nodos (sin fase): no se "
-              "reconstruye la foto con fidelidad. No hace falta para suplantar (B2).")
+    resultado("B4 reconstrucción de la cara desde el .csv", ok_des,
+              "la rama de Pablo Anguita mostró que un template de magnitudes de Gabor "
+              "puede bastar para reconstruir una cara aceptable, así que NO lo damos "
+              "por imposible. Con solo leer el .csv ya no hay template que usar "
+              "(cifrado). Riesgo RESIDUAL: quien robe la clave (B3) o capture un "
+              "template por otra vía sí lo tendría.")
+
+    # B5 enumeración: ¿distingue verificar un id inexistente de un rechazo?
+    sis_def = env.sistema(exponer_puntuaciones=False)
+    r_no = sis_def.verificar_t("no_existe_nadie", tpl_atacante)
+    r_si = sis_def.verificar_t(victima, tpl_atacante)
+    resultado("B5 enumeración de ids por verificar", r_no != r_si,
+              f"id inexistente -> {r_no}; id inscrito rechazado -> {r_si}. "
+              "Respuestas idénticas: no se puede averiguar quién está inscrito "
+              "(el motivo queda solo en la auditoría).")
 
     # ===================================================================== (C)
     titulo("(C) EL ATACANTE ESCRIBE EN LA BASE DE DATOS (sin la clave)")

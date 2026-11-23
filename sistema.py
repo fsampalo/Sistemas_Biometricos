@@ -14,10 +14,12 @@ variantes según qué parte del pipeline se omite:
 
 Base de datos (.csv), una fila por persona:
     id,template,mac
-  template = jets EBGM serializados (base64, con cabecera de versión/config)
-  mac      = HMAC-SHA256(clave, id | template | huella del modelo)
+  template = "aesgcm:" + AES-256-GCM(jets EBGM serializados), AAD = id | huella
+  mac      = HMAC-SHA256(clave, id | template cifrado | huella del modelo)
 
 Defensas incluidas (ver evaluar_ataques.py e INFORME.md):
+  * Confidencialidad: los templates se guardan CIFRADOS; leer el .csv no
+    da templates reutilizables.
   * Integridad por fila (HMAC): filas añadidas/alteradas sin la clave se
     rechazan al cargar. La BD queda ligada al modelo EBGM con el que se creó
     (y por tanto a sus umbrales). MAC global en <bd>.mac: detecta borrados.
@@ -44,7 +46,11 @@ import secrets
 import time
 import unicodedata
 
+import base64
+
 import numpy as np
+from cryptography.exceptions import InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 from detector import DetectorCaras, ErrorDeteccion
 from ebgm import ConfigEBGM, ExtractorEBGM, ModeloEBGM, RUTA_MODELO
@@ -62,6 +68,7 @@ UMBRAL_POR_DEFECTO = 0.20
 # Por debajo de esta "caricidad" la entrada no se considera una cara.
 UMBRAL_CARA_POR_DEFECTO = 0.80
 
+PREFIJO_CIFRADO = "aesgcm:"   # celda template = prefijo + base64(nonce | cifrado)
 MAX_PERSONAS = 10_000
 MAX_LONG_ID = 64
 _PATRON_ID = re.compile(r"^[\w][\w .,'()\-]*$", re.UNICODE)
@@ -165,6 +172,35 @@ class SistemaReconocimiento:
         msg = f"{id_}\x1f{tpl_b64}\x1f{self.huella_modelo}".encode("utf-8")
         return hmac.new(self._clave, msg, hashlib.sha256).hexdigest()
 
+    # ======================================================= cifrado en reposo
+    # El HMAC da integridad, no confidencialidad: con solo leer el .csv el
+    # atacante tenía los templates (replay por _t, enlazar personas entre BDs y
+    # el riesgo de reconstruir la cara que la rama de Pablo Anguita demostró
+    # para magnitudes de Gabor). Ahora la columna template va cifrada con
+    # AES-256-GCM; la clave se deriva de la clave maestra (separada de la del
+    # HMAC) y el id + huella del modelo van como datos asociados (AAD), así que
+    # un template cifrado no se puede mover a otra fila.
+    def _clave_cifrado(self) -> bytes:
+        return hmac.new(self._clave, b"ebgm-cifrado-templates-v1", hashlib.sha256).digest()
+
+    def _aad(self, id_: str) -> bytes:
+        return f"{id_}\x1f{self.huella_modelo}".encode("utf-8")
+
+    def _cifrar(self, id_: str, tpl_b64: str) -> str:
+        nonce = secrets.token_bytes(12)
+        ct = AESGCM(self._clave_cifrado()).encrypt(nonce, tpl_b64.encode("ascii"), self._aad(id_))
+        return PREFIJO_CIFRADO + base64.b64encode(nonce + ct).decode("ascii")
+
+    def _descifrar(self, id_: str, celda: str) -> str:
+        if not celda.startswith(PREFIJO_CIFRADO):
+            raise ValueError("template sin cifrar en la BD")
+        try:
+            raw = base64.b64decode(celda[len(PREFIJO_CIFRADO):], validate=True)
+            return AESGCM(self._clave_cifrado()).decrypt(
+                raw[:12], raw[12:], self._aad(id_)).decode("ascii")
+        except (InvalidTag, ValueError) as e:
+            raise ValueError(f"template cifrado inválido ({type(e).__name__})") from None
+
     # ================================================================= BD CSV
     def _cargar_bd(self) -> None:
         self._bd.clear()
@@ -193,7 +229,7 @@ class SistemaReconocimiento:
                         raise ValueError("id duplicado; se conserva la primera fila")
                     if len(self._bd) >= MAX_PERSONAS:
                         raise ValueError("límite de personas alcanzado")
-                    tpl = self.extractor.como_template(fila["template"])
+                    tpl = self.extractor.como_template(self._descifrar(id_, fila["template"]))
                     self._bd[id_] = tpl
                     self._rep[id_] = self.extractor.representar(tpl)
                 except Exception as e:  # fila corrupta/manipulada: se aparta
@@ -225,8 +261,8 @@ class SistemaReconocimiento:
         w = csv.writer(buf, lineterminator="\n")
         w.writerow(["id", "template", "mac"])
         for id_, tpl in self._bd.items():
-            b64 = self.extractor.serializar(tpl)
-            w.writerow([id_, b64, self._mac(id_, b64)])
+            cifrado = self._cifrar(id_, self.extractor.serializar(tpl))
+            w.writerow([id_, cifrado, self._mac(id_, cifrado)])
         d = os.path.dirname(os.path.abspath(self.ruta_bd))
         os.makedirs(d, exist_ok=True)
         tmp = f"{self.ruta_bd}.{os.getpid()}.tmp"
@@ -347,10 +383,18 @@ class SistemaReconocimiento:
     def _verificar_template(self, id_, template: np.ndarray) -> dict:
         self._exigir_integridad()
         id_ = validar_id(id_)
+        rep = self.extractor.representar(template)
         if id_ not in self._bd:
-            return {"verificado": False, "similitud": None,
-                    "motivo": f"'{id_}' no está inscrito"}
-        s = float(self._similitudes_rep(self.extractor.representar(template), [id_])[0])
+            # Misma respuesta (y mismo trabajo) que un rechazo normal: antes
+            # se respondía "'x' no está inscrito", lo que permitía enumerar
+            # quién está en la BD. El motivo queda solo en la auditoría.
+            self._similitudes_rep(rep, list(self._bd)[:1])
+            self._auditar("verificar_id_desconocido", id=id_)
+            r = {"verificado": False}
+            if self.exponer_puntuaciones:
+                r.update(similitud=None, umbral=self.umbral, motivo="id no inscrito")
+            return r
+        s = float(self._similitudes_rep(rep, [id_])[0])
         r = {"verificado": bool(s >= self.umbral)}
         if self.exponer_puntuaciones:
             r.update(similitud=s, umbral=self.umbral)

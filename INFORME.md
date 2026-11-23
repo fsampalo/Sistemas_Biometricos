@@ -93,7 +93,7 @@ Sistema **desplegado** (BD real, umbral 0,231 calibrado a FAR 1 %).
 
 ## 4. Fase 2 — Evaluación de seguridad (`evaluar_ataques.py`)
 
-22 ataques **ejecutados** sobre una copia de la BD. **13 bloqueados, 9
+23 ataques **ejecutados** sobre una copia de la BD. **16 bloqueados, 7
 vulnerabilidades conocidas.**
 
 ### 4.1 (A) El atacante se salta partes del sistema
@@ -111,10 +111,11 @@ vulnerabilidades conocidas.**
 ### 4.2 (B) El atacante lee la BD
 | Ataque | Resultado | Mitigación |
 |---|---|---|
-| B1 Exfiltración de templates | ⚠️ VULNERABLE: en claro | HMAC = integridad, no confidencialidad. Cifrar en reposo; *template protection* |
-| B2 *Replay* de la cadena base64 del .csv | ⚠️ VULNERABLE | Igual que A1 |
+| B1 Exfiltración de templates | ✅ la columna template va **cifrada** (AES-256-GCM, AAD = id + huella del modelo) | Los ids siguen en claro. Con la clave robada (B3), sí se descifran |
+| B2 *Replay* de la celda del .csv por `verificar_t` | ✅ rechazado: la celda cifrada no es un template | El replay de un template obtenido por otra vía sigue siendo A1 |
 | B3 Clave HMAC en `models/clave_bd.key` | ⚠️ VULNERABLE si se lee el disco | `EBGM_CLAVE_BD` por entorno, secreto del orquestador o HSM |
-| B4 Reconstruir la cara desde el template | ✅ no factible con fidelidad (solo magnitudes en 31 nodos) | No hace falta para suplantar (B2) |
+| B4 Reconstruir la cara desde el template | ✅ desde el .csv no hay template (cifrado). **No lo damos por imposible**: la rama de Pablo Anguita lo logró con magnitudes de Gabor | Riesgo residual si se roba la clave o se captura un template; *template protection* / plantillas cancelables |
+| B5 Enumerar ids con `verificar` | ✅ id inexistente y rechazo dan la misma respuesta | El motivo solo queda en la auditoría |
 
 ### 4.3 (C) El atacante escribe en la BD (sin la clave)
 | Ataque | Resultado |
@@ -131,7 +132,7 @@ vulnerabilidades conocidas.**
 | C10 Misma cara con otro nombre | ✅ aceptada pero marcada como `posible_duplicado` |
 
 ### 4.4 Otros defectos conocidos (por diseño o fuera de alcance)
-- **Enumeración**: `verificar` responde «'x' no está inscrito» ⇒ revela quién está en la BD.
+- **Ids en claro en el .csv**: quien lea la BD sabe QUIÉN está inscrito (no su template). Por la API ya no se puede enumerar (B5).
 - **Oráculo vía `inscribir`**: aunque no se exponen similitudes, `posible_duplicado` devuelve el id de la persona inscrita a la que se parece la cara. Quien tenga permiso para inscribir puede usarlo para identificar a alguien (es un aviso pensado para el operador).
 - **Homoglifos**: «аdele» con «а» cirílica es un id distinto que se ve igual.
 - **Sin límite de intentos** entre procesos: quien llama a la API en Python puede reintentar sin fin.
@@ -141,6 +142,11 @@ vulnerabilidades conocidas.**
 - Umbral elegido a **FAR 1 %**, que prioriza la seguridad sobre la comodidad (FRR alta con 1 foto). Otro punto de operación: `inscribir_dataset.py --far-objetivo 0.05`.
 
 ---
+
+## 4.5 Cambios de la rama `fernando`
+Ver [`COMPARATIVA.md`](COMPARATIVA.md): templates cifrados en reposo, clave fuera
+del repositorio (estaba versionada y se ha rotado), sin enumeración de ids y B4
+revisado a partir del hallazgo de la rama de Pablo Anguita.
 
 ## 5. Pendiente
 - **Fase 3**: evaluar el sistema del grupo rival (`evaluar_ataques.py` sirve de plantilla).
