@@ -7,7 +7,7 @@ Detector: YuNet, red neuronal ligera de OpenCV (cv2.FaceDetectorYN).
 Devuelve caja + 5 landmarks (ojos, nariz, comisuras) -> permite alinear.
 
 Uso rápido:
-    from detector import DetectorCaras
+    from reconocimiento.detector import DetectorCaras
     det = DetectorCaras()
     cara = det.extraer_cara("foto.jpg")   # np.ndarray 112x112 BGR alineada, o lanza excepción
 """
@@ -21,10 +21,9 @@ from dataclasses import dataclass, field
 import cv2
 import numpy as np
 
-RUTA_MODELO_YUNET = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "models", "face_detection_yunet_2023mar.onnx",
-)
+from .rutas import DIR_MODELOS, DIR_SALIDA
+
+RUTA_MODELO_YUNET = os.path.join(DIR_MODELOS, "face_detection_yunet_2023mar.onnx")
 SHA256_YUNET = "8f2383e4dd3cfbb4553ea8718107fc0423210dc964f9f4280604804ed2552fa4"
 
 # Posiciones de referencia de los 5 landmarks para una cara de 112x112
@@ -251,7 +250,7 @@ if __name__ == "__main__":
     import argparse
     p = argparse.ArgumentParser(description="Prueba del detector de caras")
     p.add_argument("imagenes", nargs="+")
-    p.add_argument("--salida", default="salida")
+    p.add_argument("--salida", default=os.path.join(DIR_SALIDA, "detector"))
     a = p.parse_args()
 
     os.makedirs(a.salida, exist_ok=True)

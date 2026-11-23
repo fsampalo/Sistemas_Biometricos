@@ -17,10 +17,10 @@ reproducir (sección 6).
 |---|---|
 | Python | ✅ |
 | Repositorio fácil de ejecutar + **Docker** | ✅ `docker build -t ebgm . && docker run --rm ebgm` arranca con la BD lista |
-| BD en **.csv** | ✅ `bd_sistema.csv`: `id,template,mac` (+ `bd_sistema.csv.mac`) |
+| BD en **.csv** | ✅ `datos/bd_sistema.csv`: `id,template,mac` (+ `.mac`); templates cifrados |
 | Personas inscritas | ✅ **50** = 49 famosos del `Dataset.tar.gz` + **El Cigala**. (El enunciado dice 50+1; el comprimido trae 49.) |
 | 9 métodos (`inscribir/verificar/identificar` × normal, `_sd`, `_t`) | ✅ probados en `demo.py`, coherentes entre variantes |
-| Evaluación con ataques (saltar partes, leer BD, escribir BD) | ✅ `evaluar_ataques.py`: 22 ataques ejecutados |
+| Evaluación con ataques (saltar partes, leer BD, escribir BD) | ✅ `scripts/evaluar_ataques.py`: 23 ataques ejecutados |
 
 ---
 
@@ -159,9 +159,9 @@ revisado a partir del hallazgo de la rama de Pablo Anguita.
 
 ## 6. Cómo reproducir
 ```bash
-python inscribir_dataset.py      # modelo EBGM + 50 personas + umbrales
-python demo.py                   # los 9 métodos
-python ajuste_ebgm.py            # fase 1: comparación de variantes (lento)
-python evaluar.py                # fase 2: rendimiento (+ salida/det.png)
-python evaluar_ataques.py        # fase 2: seguridad
+python scripts/inscribir_dataset.py   # modelo EBGM + 50 personas + umbrales
+python scripts/demo.py                # los 9 métodos
+python scripts/ajuste_ebgm.py         # fase 1: comparación de variantes (lento)
+python scripts/evaluar.py             # fase 2: rendimiento (+ salida/det.png)
+python scripts/evaluar_ataques.py     # fase 2: seguridad
 ```

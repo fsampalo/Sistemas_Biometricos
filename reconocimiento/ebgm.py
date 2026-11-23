@@ -61,8 +61,9 @@ from dataclasses import asdict, dataclass, field
 import cv2
 import numpy as np
 
-AQUI = os.path.dirname(os.path.abspath(__file__))
-RUTA_MODELO = os.path.join(AQUI, "models", "ebgm_modelo.npz")
+from .rutas import DIR_MODELOS
+
+RUTA_MODELO = os.path.join(DIR_MODELOS, "ebgm_modelo.npz")
 
 # Plantilla de 5 landmarks para la cara de 112x112 (la misma que usa detector.py)
 # Orden: ojo (izq. de la imagen), ojo (dcha.), nariz, boca (izq.), boca (dcha.)

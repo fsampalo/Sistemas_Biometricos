@@ -14,7 +14,7 @@ El objetivo de la práctica no es un sistema sin defectos, sino que el rival no
 encuentre defectos que nosotros no conozcamos.
 
 Uso:
-    python evaluar_ataques.py
+    python scripts/evaluar_ataques.py
 """
 
 from __future__ import annotations
@@ -22,17 +22,19 @@ from __future__ import annotations
 import csv
 import glob
 import os
+import sys
 import shutil
 import tempfile
 
 import cv2
 import numpy as np
 
-from detector import DetectorCaras
-from ebgm import RUTA_MODELO
-from sistema import ErrorSistema, SistemaReconocimiento, RUTA_BD_POR_DEFECTO
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # raíz del repo
 
-AQUI = os.path.dirname(os.path.abspath(__file__))
+from reconocimiento.detector import DetectorCaras
+from reconocimiento.ebgm import RUTA_MODELO
+from reconocimiento.rutas import DIR_DATASET, DIR_MODELOS
+from reconocimiento.sistema import ErrorSistema, SistemaReconocimiento, RUTA_BD_POR_DEFECTO
 RESUMEN: list[tuple[str, str, str]] = []
 
 
@@ -86,7 +88,7 @@ class Entorno:
 
 
 def foto_famoso(nombre: str) -> str:
-    return glob.glob(os.path.join(AQUI, "Dataset", nombre + "*"))[0]
+    return glob.glob(os.path.join(DIR_DATASET, nombre + "*"))[0]
 
 
 def main():
@@ -228,7 +230,7 @@ def main():
     ok, r = intento(lambda: sis.verificar_t(victima, robado))
     resultado("B2 replay del template leído del .csv", ok and r["verificado"],
               f"verificar_t('{victima}', celda_del_csv) -> {r if not ok else r['verificado']}")
-    ruta_clave = os.path.join(AQUI, "models", "clave_bd.key")
+    ruta_clave = os.path.join(DIR_MODELOS, "clave_bd.key")
     resultado("B3 clave HMAC legible en disco", os.path.isfile(ruta_clave)
               and not os.environ.get("EBGM_CLAVE_BD"),
               "si la clave está en models/clave_bd.key y el atacante lee el disco, "
@@ -326,7 +328,7 @@ def main():
 
     # C7 alterar el modelo / umbrales (models/ebgm_modelo.npz)
     env.escribir(original); shutil.copy(RUTA_BD_POR_DEFECTO + ".mac", env.bd + ".mac")
-    from ebgm import ModeloEBGM
+    from reconocimiento.ebgm import ModeloEBGM
     m = ModeloEBGM.cargar(env.modelo)
     m.info["umbral"] = -1.0           # ¡aceptar a todo el mundo!
     m.guardar(env.modelo)
@@ -361,7 +363,7 @@ def main():
         print(f"  {estado:10s}  {codigo}")
     nv = sum(e == "VULNERABLE" for _, e, _ in RESUMEN)
     print(f"\n  {len(RESUMEN) - nv} ataques bloqueados, {nv} vulnerabilidades CONOCIDAS "
-          "(documentadas con su mitigación en INFORME.md).")
+          "(documentadas con su mitigación en docs/INFORME.md).")
 
 
 if __name__ == "__main__":

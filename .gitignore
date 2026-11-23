@@ -8,6 +8,6 @@ __pycache__/
 # genera su propia clave; si se versionara, cualquiera que clone el repo
 # podría firmar y descifrar la BD)
 models/clave_bd.key
-bd_sistema.csv
-bd_sistema.csv.mac
+datos/bd_sistema.csv
+datos/bd_sistema.csv.mac
 salida/auditoria.log

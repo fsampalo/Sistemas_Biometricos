@@ -32,17 +32,20 @@ from __future__ import annotations
 import argparse
 import glob
 import os
+import sys
 import time
 from dataclasses import replace
 
 import cv2
 import numpy as np
 
-from detector import DetectorCaras, ErrorDeteccion
-from ebgm import ConfigEBGM, ExtractorEBGM
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # raíz del repo
 
-AQUI = os.path.dirname(os.path.abspath(__file__))
-CACHE = os.path.join(AQUI, "salida", "cache_caras_ajuste.npz")
+from reconocimiento.detector import DetectorCaras, ErrorDeteccion
+from reconocimiento.ebgm import ConfigEBGM, ExtractorEBGM
+from reconocimiento.rutas import DIR_CIGALA, DIR_DATASET, DIR_SALIDA
+
+CACHE = os.path.join(DIR_SALIDA, "cache_caras_ajuste.npz")
 
 
 # ----------------------------------------------------------------- aumentos
@@ -74,7 +77,7 @@ def construir_cache(forzar: bool = False) -> dict:
         return {k: z[k] for k in z.files}
     det = DetectorCaras(politica_multiples="mayor")
     fam, fam_id, aug, aug_id, aug_tipo = [], [], [], [], []
-    for ruta in sorted(glob.glob(os.path.join(AQUI, "Dataset", "*"))):
+    for ruta in sorted(glob.glob(os.path.join(DIR_DATASET, "*"))):
         nombre = os.path.splitext(os.path.basename(ruta))[0]
         try:
             img = det.cargar_imagen(ruta)
@@ -90,14 +93,14 @@ def construir_cache(forzar: bool = False) -> dict:
 
     def carpeta(c):
         caras, nombres = [], []
-        for ruta in sorted(glob.glob(os.path.join(AQUI, c, "*"))):
+        for ruta in sorted(glob.glob(os.path.join(c, "*"))):
             try:
                 caras.append(det.extraer_cara(ruta)); nombres.append(os.path.basename(ruta))
             except ErrorDeteccion:
                 pass
         return caras, nombres
 
-    cig, cig_n = carpeta("fotos_cigala")
+    cig, cig_n = carpeta(DIR_CIGALA)
     d = dict(fam=np.stack(fam), fam_id=np.array(fam_id), aug=np.stack(aug),
              aug_id=np.array(aug_id), aug_tipo=np.array(aug_tipo),
              cig=np.stack(cig), cig_n=np.array(cig_n))

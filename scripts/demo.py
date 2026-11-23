@@ -6,19 +6,21 @@ Las inscripciones de prueba se hacen sobre una COPIA temporal de la BD para no
 ensuciar la real.
 
 Uso:
-    python demo.py
+    python scripts/demo.py
 """
 
 from __future__ import annotations
 
 import os
+import sys
 import shutil
 import tempfile
 
-from ebgm import RUTA_MODELO
-from sistema import RUTA_BD_POR_DEFECTO, ErrorSistema, SistemaReconocimiento
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # raíz del repo
 
-AQUI = os.path.dirname(os.path.abspath(__file__))
+from reconocimiento.ebgm import RUTA_MODELO
+from reconocimiento.rutas import DIR_CIGALA_TEST, DIR_DATASET, RAIZ
+from reconocimiento.sistema import RUTA_BD_POR_DEFECTO, ErrorSistema, SistemaReconocimiento
 
 
 def asegurar_bd():
@@ -50,9 +52,9 @@ def main():
     print(f"BD: {len(sis.personas())} personas | umbral={sis.umbral:+.4f}\n")
 
     # foto del cigala que el sistema NUNCA ha visto (no usada al inscribir)
-    foto = os.path.join(AQUI, "fotos_cigala_test", "baltycka2024_01.jpg")
-    otra = os.path.join(AQUI, "Dataset", "keanu_reeves_2021.png")
-    print(f"Foto de prueba: {os.path.relpath(foto, AQUI)} (cigala, no inscrita)\n")
+    foto = os.path.join(DIR_CIGALA_TEST, "baltycka2024_01.jpg")
+    otra = os.path.join(DIR_DATASET, "keanu_reeves_2021.png")
+    print(f"Foto de prueba: {os.path.relpath(foto, RAIZ)} (cigala, no inscrita)\n")
 
     print("── pipeline completo (detector + extractor + matcher) ──")
     print("  identificar(foto)            ->", corto(sis.identificar(foto)))
@@ -84,7 +86,7 @@ def main():
         print("  inscribir('cigala', ...) otra vez  -> rechazado:", e)
 
     shutil.rmtree(tmp, ignore_errors=True)
-    print("\nListo. Evaluación: python evaluar.py | Seguridad: python evaluar_ataques.py")
+    print("\nListo. Evaluación: python scripts/evaluar.py | Seguridad: python scripts/evaluar_ataques.py")
 
 
 if __name__ == "__main__":

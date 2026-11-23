@@ -32,16 +32,18 @@ from __future__ import annotations
 import argparse
 import glob
 import os
+import sys
 import time
 
 import numpy as np
 
-from ajuste_ebgm import aumentos, dprime, eer
-from detector import DetectorCaras, ErrorDeteccion
-from inscribir_dataset import id_desde_fichero
-from sistema import SistemaReconocimiento
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # raíz del repo
 
-AQUI = os.path.dirname(os.path.abspath(__file__))
+from ajuste_ebgm import aumentos, dprime, eer
+from inscribir_dataset import id_desde_fichero
+from reconocimiento.detector import DetectorCaras, ErrorDeteccion
+from reconocimiento.rutas import DIR_CIGALA, DIR_CIGALA_TEST, DIR_DATASET, DIR_SALIDA
+from reconocimiento.sistema import SistemaReconocimiento
 
 
 def titulo(t):
@@ -55,9 +57,9 @@ def tar_a_far(gen, imp, far):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--dataset", default=os.path.join(AQUI, "Dataset"))
-    p.add_argument("--cigala-dir", default=os.path.join(AQUI, "fotos_cigala"))
-    p.add_argument("--cigala-test", default=os.path.join(AQUI, "fotos_cigala_test"))
+    p.add_argument("--dataset", default=DIR_DATASET)
+    p.add_argument("--cigala-dir", default=DIR_CIGALA)
+    p.add_argument("--cigala-test", default=DIR_CIGALA_TEST)
     p.add_argument("--sin-robustez", action="store_true", help="omite el bloque 4 (lento)")
     a = p.parse_args()
 
@@ -130,7 +132,7 @@ def main():
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
-        os.makedirs(os.path.join(AQUI, "salida"), exist_ok=True)
+        os.makedirs(DIR_SALIDA, exist_ok=True)
         fig, ax = plt.subplots(1, 2, figsize=(11, 4))
         bins = np.linspace(min(imp.min(), gen_1f.min()), max(imp.max(), gen_bd.max()), 40)
         ax[0].hist(imp, bins, alpha=.6, density=True, label="impostores")
@@ -144,7 +146,7 @@ def main():
         ax[1].loglog(np.maximum(far, 1e-4), np.maximum(frr, 1e-4))
         ax[1].set_xlabel("FAR"); ax[1].set_ylabel("FRR"); ax[1].set_title("DET (1 foto)")
         ax[1].grid(True, which="both", alpha=.3)
-        fig.tight_layout(); fig.savefig(os.path.join(AQUI, "salida", "det.png"), dpi=110)
+        fig.tight_layout(); fig.savefig(os.path.join(DIR_SALIDA, "det.png"), dpi=110)
         print("\n  Figura: salida/det.png")
     except ImportError:
         pass

@@ -2,9 +2,9 @@
 #
 #   docker build -t ebgm .
 #   docker run --rm ebgm                                  # demo de los 9 métodos
-#   docker run --rm ebgm python evaluar.py                # evaluación (fase 2)
-#   docker run --rm ebgm python evaluar_ataques.py        # ataques (fase 2)
-#   docker run --rm -v "$PWD/fotos:/fotos" ebgm python sistema.py identificar --foto /fotos/x.jpg
+#   docker run --rm ebgm python scripts/evaluar.py                # evaluación (fase 2)
+#   docker run --rm ebgm python scripts/evaluar_ataques.py        # ataques (fase 2)
+#   docker run --rm -v "$PWD/fotos:/fotos" ebgm python -m reconocimiento.sistema identificar --foto /fotos/x.jpg
 #
 # El build entrena el modelo EBGM e inscribe las 50 personas, así que el
 # contenedor arranca con la BD lista. Para la clave HMAC de la BD en producción,
@@ -22,8 +22,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-RUN if [ ! -d Dataset ] && [ -f Dataset.tar.gz ]; then tar -xzf Dataset.tar.gz; fi \
- && python download_models.py \
- && python inscribir_dataset.py
+RUN if [ ! -d datos/Dataset ] && [ -f datos/Dataset.tar.gz ]; then tar -xzf datos/Dataset.tar.gz -C datos; fi \
+ && python scripts/download_models.py \
+ && python scripts/inscribir_dataset.py
 
-CMD ["python", "demo.py"]
+CMD ["python", "scripts/demo.py"]

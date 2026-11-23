@@ -9,7 +9,8 @@ import os
 import sys
 import urllib.request
 
-DIR_MODELOS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
+# raíz del repo -> models/ (no importa el paquete: se ejecuta antes que nada)
+DIR_MODELOS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models")
 
 MODELOS = {
     "face_detection_yunet_2023mar.onnx": (

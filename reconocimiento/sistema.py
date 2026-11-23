@@ -52,14 +52,15 @@ import numpy as np
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
-from detector import DetectorCaras, ErrorDeteccion
-from ebgm import ConfigEBGM, ExtractorEBGM, ModeloEBGM, RUTA_MODELO
+from .detector import DetectorCaras, ErrorDeteccion
+from .ebgm import ConfigEBGM, ExtractorEBGM, ModeloEBGM, RUTA_MODELO
 
-AQUI = os.path.dirname(os.path.abspath(__file__))
-RUTA_BD_POR_DEFECTO = os.path.join(AQUI, "bd_sistema.csv")
-RUTA_CLAVE_POR_DEFECTO = os.path.join(AQUI, "models", "clave_bd.key")
-RUTA_AUDITORIA = os.path.join(AQUI, "salida", "auditoria.log")
-RUTA_CALIBRACION = os.path.join(AQUI, "models", "calibracion.json")  # solo informe
+from .rutas import DIR_MODELOS, DIR_SALIDA, RUTA_BD
+
+RUTA_BD_POR_DEFECTO = RUTA_BD
+RUTA_CLAVE_POR_DEFECTO = os.path.join(DIR_MODELOS, "clave_bd.key")
+RUTA_AUDITORIA = os.path.join(DIR_SALIDA, "auditoria.log")
+RUTA_CALIBRACION = os.path.join(DIR_MODELOS, "calibracion.json")  # solo informe
 
 # Umbral de decisión (similitud EBGM). Lo calibra inscribir_dataset.py y se
 # guarda DENTRO del modelo (models/ebgm_modelo.npz), cuyo hash va en el HMAC de
@@ -124,7 +125,7 @@ class SistemaReconocimiento:
         """
         if not os.path.isfile(ruta_modelo):
             raise FileNotFoundError(
-                f"Falta el modelo EBGM ({ruta_modelo}). Ejecuta: python inscribir_dataset.py")
+                f"Falta el modelo EBGM ({ruta_modelo}). Ejecuta: python scripts/inscribir_dataset.py")
         self.extractor = ExtractorEBGM(cfg, modelo=ruta_modelo)
         self.huella_modelo = ModeloEBGM.sha256(ruta_modelo)[:16]
         cal = self.extractor.modelo.info
@@ -378,7 +379,7 @@ class SistemaReconocimiento:
             raise ErrorSistema(
                 "Integridad de la BD comprometida (filas alteradas, borradas o "
                 f"restauradas; {len(self.filas_rechazadas)} filas rechazadas). El "
-                "sistema no opera hasta reconstruir la BD (python inscribir_dataset.py)")
+                "sistema no opera hasta reconstruir la BD (python scripts/inscribir_dataset.py)")
 
     def _verificar_template(self, id_, template: np.ndarray) -> dict:
         self._exigir_integridad()

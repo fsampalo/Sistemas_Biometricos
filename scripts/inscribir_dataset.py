@@ -17,8 +17,8 @@ Crea el sistema listo para usar:
 NUNCA usa fotos_cigala_test/ (reservado para la evaluación final).
 
 Uso:
-    python inscribir_dataset.py
-    python inscribir_dataset.py --far-objetivo 0.005
+    python scripts/inscribir_dataset.py
+    python scripts/inscribir_dataset.py --far-objetivo 0.005
 """
 
 from __future__ import annotations
@@ -27,16 +27,18 @@ import argparse
 import glob
 import json
 import os
+import sys
 import re
 
 import cv2
 import numpy as np
 
-from detector import DetectorCaras, ErrorDeteccion
-from ebgm import ExtractorEBGM, RUTA_MODELO
-from sistema import (RUTA_BD_POR_DEFECTO, RUTA_CALIBRACION, SistemaReconocimiento)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # raíz del repo
 
-AQUI = os.path.dirname(os.path.abspath(__file__))
+from reconocimiento.detector import DetectorCaras, ErrorDeteccion
+from reconocimiento.ebgm import ExtractorEBGM, RUTA_MODELO
+from reconocimiento.rutas import DIR_CIGALA, DIR_DATASET, RAIZ
+from reconocimiento.sistema import (RUTA_BD_POR_DEFECTO, RUTA_CALIBRACION, SistemaReconocimiento)
 
 
 def id_desde_fichero(ruta: str) -> str:
@@ -81,8 +83,8 @@ def no_caras(caras_fam: list[np.ndarray], fotos: list[np.ndarray]) -> list[tuple
 
 def main():
     p = argparse.ArgumentParser(description="Entrena el modelo EBGM e inscribe famosos + cigala")
-    p.add_argument("--dataset", default=os.path.join(AQUI, "Dataset"))
-    p.add_argument("--cigala-dir", default=os.path.join(AQUI, "fotos_cigala"))
+    p.add_argument("--dataset", default=DIR_DATASET)
+    p.add_argument("--cigala-dir", default=DIR_CIGALA)
     p.add_argument("--bd", default=RUTA_BD_POR_DEFECTO)
     p.add_argument("--far-objetivo", type=float, default=0.01,
                    help="FAR objetivo para fijar el umbral de decisión")
@@ -101,7 +103,7 @@ def main():
     ext.fijar_modelo(modelo)
     print(f"[modelo] Face Bunch Graph de {len(caras_fam)} caras (+espejos), "
           f"{ext.n_nodos} nodos x {ext.cfg.n_filtros} filtros -> "
-          f"{os.path.relpath(RUTA_MODELO, AQUI)}")
+          f"{os.path.relpath(RUTA_MODELO, RAIZ)}")
 
     # mismo camino que inscribir(): template de inscripción (con micro-variaciones)
     tpl_fam = {id_desde_fichero(r): ext.extraer_inscripcion(c) for r, c in zip(rutas_ok, caras_fam)}
@@ -175,8 +177,8 @@ def main():
     sis.auditoria = True
     sis._auditar("bd_creada", n=len(sis.personas()))
     print(f"[cigala] template medio de {len(tpl_cig_fotos)} fotos de "
-          f"{os.path.relpath(a.cigala_dir, AQUI)}")
-    print(f"\nInscritas {len(sis.personas())} personas en {os.path.relpath(a.bd, AQUI)}")
+          f"{os.path.relpath(a.cigala_dir, RAIZ)}")
+    print(f"\nInscritas {len(sis.personas())} personas en {os.path.relpath(a.bd, RAIZ)}")
     if fallos:
         print(f"No se pudieron procesar {len(fallos)}:")
         for n, e in fallos:
