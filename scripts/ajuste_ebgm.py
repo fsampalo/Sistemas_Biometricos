@@ -227,8 +227,8 @@ VARIANTES = {
     # ---- 5ª ronda: invariancia a espejo en el matcher (por defecto desde aquí)
     "R5 FINAL (defecto)": dict(agregacion="media"),
     "R5 FINAL sin invariancia espejo": dict(agregacion="media", invariante_espejo=False),
-    # ---- 6ª ronda (rama fernando): agregación robusta de los nodos. Probado
-    # y DESCARTADO en esta ronda (scratch, no versionado): T-norm con la
+    # ---- 6ª ronda: agregación robusta de los nodos. Probado y DESCARTADO en
+    # esta ronda (experimentos aparte, no incluidos aquí): T-norm con la
     # cohorte (peor), pesos de Fisher por nodo aprendidos de los aumentos (sin
     # efecto) o del cigala (mejoran, pero bajan los ojos por sus gafas de sol
     # y suben boca/mentón por su barba: son pesos de UNA persona), WCCN por

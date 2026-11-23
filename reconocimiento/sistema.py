@@ -174,13 +174,13 @@ class SistemaReconocimiento:
         return hmac.new(self._clave, msg, hashlib.sha256).hexdigest()
 
     # ======================================================= cifrado en reposo
-    # El HMAC da integridad, no confidencialidad: con solo leer el .csv el
-    # atacante tenía los templates (replay por _t, enlazar personas entre BDs y
-    # el riesgo de reconstruir la cara que la rama de Pablo Anguita demostró
-    # para magnitudes de Gabor). Ahora la columna template va cifrada con
-    # AES-256-GCM; la clave se deriva de la clave maestra (separada de la del
-    # HMAC) y el id + huella del modelo van como datos asociados (AAD), así que
-    # un template cifrado no se puede mover a otra fila.
+    # El HMAC da integridad, no confidencialidad: con templates en claro, leer
+    # el .csv bastaría para hacer replay por _t, enlazar personas entre BDs o
+    # intentar reconstruir la cara a partir de las magnitudes de Gabor. Por eso
+    # la columna template va cifrada con AES-256-GCM; la clave se deriva de la
+    # clave maestra (separada de la del HMAC) y el id + huella del modelo van
+    # como datos asociados (AAD), así que un template cifrado no se puede mover
+    # a otra fila.
     def _clave_cifrado(self) -> bytes:
         return hmac.new(self._clave, b"ebgm-cifrado-templates-v1", hashlib.sha256).digest()
 

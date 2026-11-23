@@ -237,9 +237,9 @@ def main():
               "puede firmar filas (ver C6). Mitigación: EBGM_CLAVE_BD en el entorno "
               "/ secreto del orquestador / HSM, fuera del alcance de quien lee la BD.")
     resultado("B4 reconstrucción de la cara desde el .csv", ok_des,
-              "la rama de Pablo Anguita mostró que un template de magnitudes de Gabor "
-              "puede bastar para reconstruir una cara aceptable, así que NO lo damos "
-              "por imposible. Con solo leer el .csv ya no hay template que usar "
+              "con un template de magnitudes de Gabor se puede llegar a reconstruir "
+              "una cara aceptable, así que NO lo damos por imposible. Con solo leer "
+              "el .csv no hay template que usar "
               "(cifrado). Riesgo RESIDUAL: quien robe la clave (B3) o capture un "
               "template por otra vía sí lo tendría.")
 

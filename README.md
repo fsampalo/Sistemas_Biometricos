@@ -16,7 +16,7 @@ foto -> [DETECTOR YuNet] -> cara 112x112 alineada -> [EXTRACTOR EBGM] -> templat
 |---|---|---|
 | Detector | [`reconocimiento/detector.py`](reconocimiento/detector.py) | YuNet (OpenCV). Detecta la cara y la **alinea** a 112×112 con 5 landmarks. Lee JPG/PNG/WebP/AVIF/HEIC. |
 | Extractor + matcher | [`reconocimiento/ebgm.py`](reconocimiento/ebgm.py) | **EBGM**: CLAHE → Gabor 7×8 → grafo fiducial de 31 nodos → ajuste elástico con el *bunch* → jets → similitud. |
-| Sistema + BD | [`reconocimiento/sistema.py`](reconocimiento/sistema.py) | Los **9 métodos** del enunciado, BD `.csv` con integridad HMAC y defensas. |
+| Sistema + BD | [`reconocimiento/sistema.py`](reconocimiento/sistema.py) | Los **9 métodos** del enunciado y la BD `.csv` (templates cifrados y firmados). |
 | Modelo / BD | [`scripts/inscribir_dataset.py`](scripts/inscribir_dataset.py) | Entrena el modelo EBGM, inscribe las 50 personas y calibra los umbrales. |
 | Ajuste (fase 1) | [`scripts/ajuste_ebgm.py`](scripts/ajuste_ebgm.py) | Banco de experimentos con el que se eligió la configuración. |
 | Evaluación (fase 2) | [`scripts/evaluar.py`](scripts/evaluar.py) | EER, d', FAR/FRR, CMC, robustez, riesgos y tiempos del sistema desplegado. |
@@ -42,8 +42,8 @@ docker run --rm ebgm python scripts/evaluar.py
 docker run --rm ebgm python scripts/evaluar_ataques.py
 ```
 
-El build extrae `datos/Dataset.tar.gz` (si falta `datos/Dataset/`), descarga YuNet (verificando su sha256), entrena
-el modelo e inscribe a las 50 personas: el contenedor arranca listo.
+El build descarga YuNet (verificando su sha256), entrena el modelo e inscribe a
+las 50 personas: el contenedor arranca listo. Por defecto ejecuta la demo.
 
 ### En local
 
@@ -68,7 +68,7 @@ sis.identificar("quien.jpg")               # -> {'id': 'ana', 'aceptado': True}
 
 # modo evaluación (similitudes + ranking top-5), p. ej. para curvas DET:
 ev = SistemaReconocimiento(exponer_puntuaciones=True)
-ev.verificar("ana", "otra_ana.jpg")        # -> {'verificado': True, 'similitud': 0.31, 'umbral': 0.23}
+ev.verificar("ana", "otra_ana.jpg")        # -> {'verificado': True, 'similitud': 0.45, 'umbral': 0.33}
 
 cara = sis.extraer_cara("foto.jpg")        # recorte 112x112 alineado (entrada de los _sd)
 sis.inscribir_sd("ana", cara)              # omite el detector
@@ -85,12 +85,14 @@ sis.identificar_t(tpl)
 |---|---|---|
 | `inscribir` / `verificar` / `identificar` | foto (ruta, bytes o `np.ndarray` BGR) | — |
 | `inscribir_sd` / `verificar_sd` / `identificar_sd` | cara recortada y alineada 112×112 | detector |
-| `inscribir_t` / `verificar_t` / `identificar_t` | template (`np.ndarray` (31, 58) o cadena base64 del .csv) | detector y extractor |
+| `inscribir_t` / `verificar_t` / `identificar_t` | template (`np.ndarray` (31, 58) o su serialización base64) | detector y extractor |
 
 - `identificar` es de **conjunto abierto**: devuelve `id=None` si la mejor
   similitud no supera el umbral (la persona no está inscrita).
 - `inscribir*` **no sobrescribe** un id existente salvo con `sobrescribir=True`,
   y avisa de `posible_duplicado` si esa cara ya está inscrita con otro nombre.
+- `verificar*` responde igual para un id que no existe que para un rechazo, así
+  que no revela quién está inscrito.
 - Los errores controlados lanzan `ErrorDeteccion` (no hay cara, varias caras al
   inscribir, imagen inválida) o `ErrorSistema` / `ErrorCalidad` (id inválido,
   template inválido, entrada que no parece una cara, BD comprometida).
@@ -99,8 +101,13 @@ sis.identificar_t(tpl)
   (modo evaluación). Otras opciones del constructor: `estricto=False` (no bloquear si la
   integridad de la BD falla), `umbral=...` (otro punto de operación).
 
-Línea de comandos (añade `--puntuaciones` para ver similitudes): `python -m reconocimiento.sistema identificar --foto x.jpg`,
-`python -m reconocimiento.sistema verificar --id cigala --foto x.jpg`, `python -m reconocimiento.sistema listar`.
+Línea de comandos (añade `--puntuaciones` para ver similitudes):
+
+```bash
+python -m reconocimiento.sistema identificar --foto x.jpg
+python -m reconocimiento.sistema verificar --id cigala --foto x.jpg
+python -m reconocimiento.sistema listar
+```
 
 ## El método: EBGM
 
@@ -115,10 +122,13 @@ Línea de comandos (añade `--puntuaciones` para ver similitudes): `python -m re
    desplaza elásticamente (±3 px) hasta donde su jet mejor encaja en el manojo,
    con penalización de deformación y regularización con sus vecinos.
 5. **Template.** Los 31 jets más la posición de cada nodo: matriz (31, 58).
-6. **Matcher.** Media, nodo a nodo, del coseno entre jets comprimidos (√) y
-   normalizados por la cohorte (z-score por nodo y filtro). Es **invariante a
-   espejo**: se compara también con el grafo reflejado de la sonda (permutación
-   exacta de nodos y orientaciones) y se toma el máximo.
+6. **Matcher.** Coseno, nodo a nodo, entre jets comprimidos (√) y normalizados
+   por la cohorte (z-score por nodo y filtro). Las similitudes de los nodos se
+   agregan de forma **robusta**: se calcula cada media cara (lado + eje
+   central) descartando sus 3 nodos peores y se toma la mejor, lo que tolera
+   giros de cabeza y oclusiones parciales (gafas, pelo, barba). Es además
+   **invariante a espejo**: se compara también con el grafo reflejado de la
+   sonda y se toma el máximo.
 
 El **modelo** (`models/ebgm_modelo.npz`: manojo, media/desviación de la cohorte y
 umbrales) es común a todas las identidades. El Cigala se inscribe como el
@@ -127,29 +137,27 @@ umbrales) es común a todas las identidades. El Cigala se inscribe como el
 ### Cómo se eligió la configuración (fase 1)
 
 `python scripts/ajuste_ebgm.py` compara variantes **sin tocar el test**
-(`datos/fotos_cigala_test/` solo se usa en `scripts/evaluar.py`). Genuinos de ajuste: los 156
-pares ordenados entre las 13 fotos del Cigala (caso real «1 foto inscrita») y 392
-fotos degradadas de los famosos. Impostores: famosos entre sí y Cigala contra famosos.
+(`datos/fotos_cigala_test/` solo se usa en `scripts/evaluar.py`). Genuinos de
+ajuste: los 156 pares ordenados entre las 13 fotos del Cigala (caso real «1 foto
+inscrita») y 392 fotos degradadas de los famosos. Impostores: famosos entre sí y
+Cigala contra famosos.
 
-| Ajuste (1 foto inscrita) | EBGM inicial (5 escalas, rejilla 9×8) | EBGM ronda 5 (media de nodos) | **EBGM final (ronda 6)** |
-|---|---|---|---|
-| EER del Cigala | 34,6 % | 14,1 % | **12,8 %** |
-| d' del Cigala | 0,65 | 2,01 | **2,14** |
-| Rank-1 del Cigala (galería de 50) | 19 % | 46 % | **51 %** |
-| TAR @ FAR 1 % del Cigala | 2,6 % | 34,6 % | **41,7 %** |
-| EER de las degradaciones | 4,6 % | 0,3 % | **0,3 %** |
-| Rank-1 de fotos en espejo | — | 98 % (71 % sin invariancia) | **98 %** |
+| Ajuste (1 foto inscrita) | EBGM inicial (5 escalas, rejilla 9×8) | **EBGM final** |
+|---|---|---|
+| EER del Cigala | 34,6 % | **12,8 %** |
+| d' del Cigala | 0,65 | **2,14** |
+| Rank-1 del Cigala (galería de 50) | 19 % | **51 %** |
+| TAR @ FAR 1 % del Cigala | 2,6 % | **41,7 %** |
+| EER de las degradaciones | 4,6 % | **0,3 %** |
+| Rank-1 de fotos en espejo | — | **98 %** |
 
 Lo que más aportó: **7 escalas** (las escalas grandes capturan la forma de la
-cara), **CLAHE** (mejor que Tan-Triggs), **grafo fiducial** y **matcher
-invariante a espejo** y, en la ronda 6, la **agregación robusta de nodos**
-(la mejor media cara, descartando sus 3 nodos peores: aguanta giros de cabeza
-y oclusiones parciales). Lo que se probó y **se descartó** por no mejorar:
-Tan-Triggs, simetrizar el template, rejilla densa, término de geometría,
-compresión logarítmica, 8 escalas, 12 orientaciones y micro-variaciones al
-inscribir (están implementados y se pueden activar en `ConfigEBGM`); y en la
-ronda 6, T-norm con la cohorte, pesos por nodo aprendidos (los del Cigala solo
-reflejan sus gafas y su barba) y WCCN por nodo.
+cara), **CLAHE** (mejor que Tan-Triggs), **grafo fiducial**, **matcher
+invariante a espejo** y **agregación robusta de nodos**. Lo que se probó y **se
+descartó** por no mejorar: Tan-Triggs, simetrizar el template, rejilla densa,
+término de geometría, compresión logarítmica, 8 escalas, 12 orientaciones,
+micro-variaciones al inscribir, normalización T-norm, pesos por nodo aprendidos
+y WCCN. El detalle, ronda a ronda, está en [`docs/INFORME.md`](docs/INFORME.md).
 
 ## Resultados (fase 2) — `python scripts/evaluar.py`
 
@@ -158,27 +166,29 @@ Sistema desplegado: umbral **0,327** (FAR objetivo 1 %).
 | Métrica | Resultado |
 |---|---|
 | FTA del detector | 0/49 famosos, 0/13 refs. del Cigala, 2/7 fotos de test (fotos de concierto con caras de ~20 px) |
-| Test del Cigala vs Cigala inscrito | **5/5 aceptadas**, rank-1 **100 %**, d' 5,4 |
-| Test del Cigala vs **1 sola foto** | EER 12,4 %, d' 2,0, TAR@FAR1 % ≈ 38 % (antes de la ronda 6: 15 %, 1,9, 25 %) |
+| Test del Cigala vs Cigala inscrito | **5/5 aceptadas**, rank-1 **100 %**, d' 5,3 |
+| Test del Cigala vs **1 sola foto** | EER 12,4 %, d' 2,0, TAR@FAR1 % ≈ 38 % |
 | FAR real en el umbral desplegado | 1,2 % |
 | Robustez (iluminación, baja resolución, JPEG 15, giro 12°, ruido, luz lateral) | **100 %** rank-1 y verificación |
 | Robustez espejo | 98 % |
-| Tiempo `verificar` / `identificar` (foto) | ~50 ms |
+| Tiempo `verificar` / `identificar` (foto) | ~100 ms (`_t` < 1 ms) |
 
 **Lectura honesta.** Con varias fotos de inscripción el sistema reconoce muy
 bien. Con **una sola foto** (el caso de los 49 famosos) y fotos muy distintas
 (otra década, perfil, gafas de sol), EBGM, que es un método clásico, se queda en
-un TAR de ~25–35 % a FAR 1 %. Para el rival: una foto nueva de un famoso muy
-distinta de la del Dataset tiene bastante probabilidad de ser rechazada.
+un TAR de ~40 % a FAR 1 %: una foto nueva de un famoso muy distinta de la del
+Dataset tiene bastante probabilidad de ser rechazada.
 
 ## Seguridad — `python scripts/evaluar_ataques.py`
 
-Defensas: templates **cifrados en reposo** (AES-256-GCM); HMAC por fila + MAC global (detecta filas alteradas, añadidas,
-intercambiadas, borradas o restauradas); BD ligada al hash del modelo, que lleva
-dentro los umbrales; modo estricto que falla en cerrado; validación de ids
-(incluida la inyección de fórmulas CSV) y de templates; control de «caricidad»
-EBGM en `_sd`/`_t`; no sobrescritura; aviso de duplicados; auditoría
-(`salida/auditoria.log`); sha256 fijado del detector; escritura atómica.
+Defensas: templates **cifrados en reposo** (AES-256-GCM); HMAC por fila + MAC
+global (detecta filas alteradas, añadidas, intercambiadas, borradas o
+restauradas); BD ligada al hash del modelo, que lleva dentro los umbrales; modo
+estricto que falla en cerrado; validación de ids (incluida la inyección de
+fórmulas CSV) y de templates; control de «caricidad» EBGM en `_sd`/`_t`;
+respuestas sin puntuaciones y sin enumeración de ids; no sobrescritura; aviso de
+duplicados; auditoría (`salida/auditoria.log`); sha256 fijado del detector;
+escritura atómica.
 
 **16 de 23 ataques bloqueados**; los **7 restantes son vulnerabilidades
 CONOCIDAS**, cada una con su mitigación (detalle en [`docs/INFORME.md`](docs/INFORME.md)).
@@ -205,18 +215,16 @@ CONOCIDAS**, cada una con su mitigación (detalle en [`docs/INFORME.md`](docs/IN
 │   └── bd_sistema.csv (+.mac) #   la BD (generada, no versionada)
 ├── models/                    # YuNet, ebgm_modelo.npz, calibracion.json (+ clave_bd.key generada)
 ├── salida/                    # det.png, auditoria.log, caché del ajuste
-├── docs/                      # INFORME.md (fases 1-2) y COMPARATIVA.md (ramas)
+├── docs/INFORME.md            # informe de las fases 1 y 2
 ├── Dockerfile
 └── requirements.txt
 ```
 
 ## Notas
 
-- La BD (`datos/bd_sistema.csv`, `.mac`) y la clave **se generan** con
-  `python scripts/inscribir_dataset.py` (o en el `docker build`); no se versionan.
-  Comparativa de ramas y cambios: [`docs/COMPARATIVA.md`](docs/COMPARATIVA.md).
-
-- `models/clave_bd.key` se genera la primera vez y **no se versiona**. En
+- La BD (`datos/bd_sistema.csv`, `.mac`) y la clave (`models/clave_bd.key`)
+  **se generan** con `python scripts/inscribir_dataset.py` (o en el
+  `docker build`) y no se versionan: cada despliegue tiene su propia clave. En
   producción, pasa la clave por entorno: `EBGM_CLAVE_BD=<64 hex>`.
 - Si se cambia `ConfigEBGM`, hay que re-ejecutar `scripts/inscribir_dataset.py`: los
   templates llevan la huella de la configuración y no se mezclan.
